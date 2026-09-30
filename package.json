@@ -29,7 +29,9 @@
     "eval:network": "node evals/run.mjs --suite network",
     "release": "semantic-release",
     "engine:prepare": "pnpm run build",
-    "engine:gate": "pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run check:build && pnpm run eval"
+    "engine:gate": "pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run check:build && pnpm run eval",
+    "verify:bundle": "webindex skill bundle",
+    "verify:engine": "webindex skill check && webindex skill vendor --check"
   },
   "keywords": [
     "skills",

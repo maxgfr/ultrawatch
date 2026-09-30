@@ -90,6 +90,10 @@ works from text that carries a stamp on every paragraph.
 - Videos are downloaded only for frames and whisper, into a temporary directory that is deleted afterwards. Only the JPEGs you asked for stay.
 - The engine is [webindex](https://github.com/maxgfr/webindex), vendored by tag and sha256 (`src/vendor/webindex.meta.json`) and checked in CI (`webindex skill vendor --check`).
 
+## Maintenance
+
+How it works, in depth: [DOCUMENTATION.md](DOCUMENTATION.md). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md). See [shared engine maintenance](ENGINE-MAINTENANCE.md) for the engine pin, source adoption checks and the daily repin workflow.
+
 ## License
 
 MIT.
