@@ -4,7 +4,7 @@ description: Watch YouTube videos for the user and answer from what they actuall
 disable-model-invocation: true
 license: MIT
 metadata:
-  version: 0.0.0
+  version: 1.0.0
   opencode/autoinvoke: 'false'
 ---
 

@@ -2395,7 +2395,7 @@ function judge(tok, videos, line) {
 }
 
 // src/version.ts
-var VERSION = "0.0.0";
+var VERSION = "1.0.0";
 
 // src/cli.ts
 var HELP = `ultrawatch v${VERSION} (webindex ${ENGINE_VERSION})
