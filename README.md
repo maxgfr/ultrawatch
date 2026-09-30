@@ -1,6 +1,7 @@
 # ultrawatch
 
-Watch YouTube for your agent. A video, a playlist or a channel becomes a
+Watch videos for your agent — YouTube, Vimeo, Dailymotion and anything
+[yt-dlp](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) reads. A video, a playlist or a channel becomes a
 timestamped, chaptered transcript and the frames that show what was on screen,
 kept on disk and searchable. The agent answers from what the video actually
 says, and every claim cites the second that says it, as `[V1 12:34]`.
@@ -28,7 +29,7 @@ invoked explicitly: `/ultrawatch` followed by a link and what you want.
 
 ## Why
 
-An agent handed a YouTube link sees a title and a description, and usually
+An agent handed a video link sees a title and a description, and usually
 answers from those plus memory. The video itself, what it says and what it
 shows, never reaches the model. When it does, it arrives as a transcript
 pasted without timestamps: it cannot be cited, cannot be checked, and has to
@@ -46,7 +47,7 @@ works from text that carries a stamp on every paragraph.
 | **What is on screen** | A frame at every scene change and chapter start, near-duplicates dropped by dHash, capped by `--effort`, each paired with what was said around it (`FRAMES.md`). |
 | **Several videos** | A playlist or channel read as a corpus, `V1`…`Vn`, and searched as one. |
 | **A citation check** | `check` fails any claim without a stamp, any `V#` that is not there, and any stamp that is past the end of its video or lands where nothing is said. It reports line by line. |
-| **Errors that say what to do** | Private, members-only, age-restricted, removed, live, or refused by YouTube: each one comes back as a note, and `doctor` shows how old your yt-dlp is. |
+| **Errors that say what to do** | Private, members-only, age-restricted, DRM-protected, removed, live, or refused by the site: each one comes back as a note, and `doctor` shows how old your yt-dlp is. |
 
 ## How it's used
 
@@ -79,13 +80,13 @@ works from text that carries a stamp on every paragraph.
 | `ULTRAWATCH_VIDEO_DIR` | where runs are kept |
 | `ULTRAWATCH_VIDEO_ENGINES` | the transcript rungs, in order: `manual-subs,auto-subs,whisper`, or `none` |
 | `ULTRAWATCH_WHISPER_MODEL`, `ULTRAWATCH_WHISPER_MAX`, `ULTRAWATCH_WHISPER_TIMEOUT_MS` | whisper's model (`small`), videos per process (3), one video's budget (30 min) |
-| `ULTRAWATCH_YTDLP_ARGS` | extra yt-dlp flags on every call, such as browser cookies when YouTube asks you to sign in, or a proxy |
+| `ULTRAWATCH_YTDLP_ARGS` | extra yt-dlp flags on every call, such as browser cookies when a site asks you to sign in, or a proxy |
 | `ULTRAWATCH_NO_WRITE` | write nothing: `fetch` prints the transcript |
 
 ## Security
 
-- No API and no key. Nothing leaves the machine except yt-dlp's requests to YouTube.
-- A URL is only ever handed to yt-dlp after `--`, and only once it has been recognised as a YouTube video, playlist or channel. The URL yt-dlp receives is rebuilt from the video id, so a string cannot be read as an option.
+- No API and no key. Nothing leaves the machine except yt-dlp's requests to the video's site.
+- A URL is only ever handed to yt-dlp after `--`, and only if it is http(s), so a string can never be read as an option. A known host's URL is rebuilt from its id first (a YouTube watch URL, Vimeo's player).
 - Videos are downloaded only for frames and whisper, into a temporary directory that is deleted afterwards. Only the JPEGs you asked for stay.
 - The engine is [webindex](https://github.com/maxgfr/webindex), vendored by tag and sha256 (`src/vendor/webindex.meta.json`) and checked in CI (`webindex skill vendor --check`).
 

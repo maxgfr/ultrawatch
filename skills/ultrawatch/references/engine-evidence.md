@@ -4,12 +4,22 @@ ultrawatch vendors the [webindex](https://github.com/maxgfr/webindex) engine
 (pinned by tag and sha256 in `src/vendor/webindex.meta.json`); everything below
 is that engine's video layer, configured under the `ULTRAWATCH_` prefix.
 
+## Which sites
+
+Anything yt-dlp reads: YouTube, Vimeo (through its player, which needs no
+login), Dailymotion, Twitch, TED, Loom, TikTok, Instagram reels, Facebook
+videos, X posts and [hundreds more](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md).
+A run is kept under the YouTube id, or `<site>-<id>` elsewhere
+(`vimeo-76979871`) — the key `--videos` takes. Subtitles are read in WebVTT or
+SRT; a site without them goes to whisper. A video served only under DRM keeps
+its subtitles but gives no frames and no whisper, and the note says so.
+
 ## How a video is read
 
 | Rung | Source | Trust |
 |---|---|---|
 | `manual-subs` | subtitles a person typed | exact, punctuated — quote freely |
-| `auto-subs` | YouTube's own speech recognition, in the video's language | good; names, numbers and jargon can be misheard |
+| `auto-subs` | the site's own speech recognition (YouTube's), in the video's language | good; names, numbers and jargon can be misheard |
 | `whisper` | local transcription (`uvx whisper-ctranslate2`, model `small`) | good; slower, same caveats |
 
 The transcript header says which (`- Transcript: … (auto-subs, track en-orig)`).
@@ -26,6 +36,9 @@ manual track in another language than the video's is marked as a translation.
 | `YouTube refused yt-dlp …` | a 403, "Sign in to confirm you're not a bot" or a PO-token error: update yt-dlp (`yt-dlp -U`; `doctor` flags a release older than 60 days), or set `ULTRAWATCH_YTDLP_ARGS="--cookies-from-browser firefox"` |
 | `age-restricted video` | needs a signed-in session: the same cookies variable |
 | `private video`, `members-only video`, `video removed`, `video unavailable` | not readable — tell the user |
+| `the site asks yt-dlp to log in` | a signed-in session: `ULTRAWATCH_YTDLP_ARGS="--cookies-from-browser firefox"` |
+| `the site serves this video under DRM` | subtitles still read; no frames, no whisper |
+| `no video at this URL` | the page holds no video yt-dlp can read |
 | `live stream in progress` / `not started yet` | read it once it has ended |
 | `no subtitles, and whisper needs uvx and ffmpeg` | install [uv](https://docs.astral.sh/uv/) and ffmpeg, or tell the user there is no transcript |
 | `transcript too sparse …` | music or a silent video: nothing is said to cite — tell the user |

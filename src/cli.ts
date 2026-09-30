@@ -30,7 +30,6 @@ import {
   VIDEO_TRANSCRIBERS,
   videoRoot,
   whisperModel,
-  youtubeVideoId,
   UsageError,
   type VideoRunner,
   ytdlpVersionAge,
@@ -38,7 +37,8 @@ import {
 import { VERSION } from "./version.js";
 
 export const HELP = `ultrawatch v${VERSION} (webindex ${ENGINE_VERSION})
-Watch YouTube for an agent: a video, a playlist or a channel turned into
+Watch videos for an agent — YouTube, Vimeo, Dailymotion and anything yt-dlp
+reads: a video, a playlist or a channel turned into
 timestamped transcripts and on-screen frames, kept on disk, searchable, and
 checked — every claim cites a [V# mm:ss] stamp that exists. Local and keyless.
 
@@ -56,7 +56,7 @@ COMMANDS
            per chapter, a [mm:ss] stamp per paragraph), segments.json and
            meta.json. Manual subtitles, else the video's own auto-captions
            (never a machine translation), else a local whisper transcription.
-           A video already on disk is reused without touching YouTube;
+           A video already on disk is reused without touching the site;
            --refresh reads it again, --lang picks the subtitle language.
   search   Rank ~45 s passages of every video under the directory — or of a
            corpus, labelled V1…Vn — against a question: each with its stamp,
@@ -112,7 +112,9 @@ function videoList(args: CommandArgs): string[] | undefined {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (!ids.length || ids.some((id) => !/^[\w-]{11}$/.test(id))) usage(`--videos takes YouTube video ids separated by commas, not "${raw}"`);
+  // A run's key: a YouTube id, or site-id for any other site (vimeo-76979871).
+  if (!ids.length || ids.some((id) => !/^[\w.-]{1,120}$/.test(id) || id.startsWith(".")))
+    usage(`--videos takes run keys — YouTube ids, or site-id like vimeo-76979871 — separated by commas, not "${raw}"`);
   return ids;
 }
 
@@ -182,7 +184,7 @@ async function run(args: CommandArgs): Promise<void> {
     const effort = argValue(args, "effort") ?? "med";
     if (!(effort in FRAME_EFFORT)) usage(`--effort must be low, med or high, not "${effort}"`);
     let runDir: string;
-    if (youtubeVideoId(target)) {
+    if (/^https?:\/\//i.test(target)) {
       const r = await fetchVideoRun(target, root, { lang: argValue(args, "lang") });
       if (!r.ok) fail(`no transcript for ${target}: ${r.reason}`);
       runDir = r.dir;

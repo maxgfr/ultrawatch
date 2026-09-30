@@ -6,7 +6,7 @@ ultrawatch search "<question>" --out <dir>          # hits labelled V1…Vn
 ultrawatch check <dir> answer.md                    # V# resolved through corpus.json
 ```
 
-`list` reads the first `--limit` videos (default 10) in the order YouTube lists
+`list` reads the first `--limit` videos (default 10) in the order the site lists
 them — a channel's `/videos` tab, newest first, when the URL names no tab —
 two at a time, each kept as its own run. `CORPUS.md` names them `V1`…`Vn`; a
 video that cannot be read keeps its label, with the reason, so the numbering

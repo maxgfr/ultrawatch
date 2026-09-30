@@ -2,7 +2,7 @@
 
 Three ways to use one video. All start from the same run: `ultrawatch fetch
 <url> --out <dir>` writes `<dir>/<id>/TRANSCRIPT.md`, and nothing after that
-touches YouTube again.
+touches the site again.
 
 ## Summary
 
