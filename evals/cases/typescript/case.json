@@ -1,0 +1,11 @@
+{
+  "url": "https://www.youtube.com/watch?v=zQnBQ4tB3ZA",
+  "kind": "code tutorial (frames)",
+  "via": "auto-subs",
+  "questions": [
+    { "q": "tsc command compile ts file to javascript", "window": [40, 80] },
+    { "q": "ide feedback variable that doesn't exist", "window": [25, 50] },
+    { "q": "annotate code with types interfaces", "window": [70, 135] }
+  ],
+  "answers": { "good": 0, "bad": 2 }
+}

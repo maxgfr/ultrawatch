@@ -1,0 +1,12 @@
+{
+  "url": "https://www.youtube.com/watch?v=iG9CE55wbtY",
+  "kind": "manual subtitles",
+  "via": "manual-subs",
+  "questions": [
+    { "q": "when will children starting school retire", "window": [120, 160] },
+    { "q": "not prepared to be wrong original", "window": [330, 360] },
+    { "q": "dance every day like mathematics", "window": [540, 570] },
+    { "q": "Gillian Lynne dancer doctor", "window": [930, 1050] }
+  ],
+  "answers": { "good": 0, "bad": 4 }
+}

@@ -1,0 +1,12 @@
+{
+  "url": "https://www.youtube.com/watch?v=OHKasiNnTeg",
+  "kind": "auto-captions only (French)",
+  "via": "auto-subs",
+  "questions": [
+    { "q": "pecorino plutôt que parmesan", "window": [30, 110] },
+    { "q": "380 grammes de spaghettis casserole 4 litres", "window": [100, 140] },
+    { "q": "trois oeufs entiers saladier", "window": [290, 310] },
+    { "q": "guanciale fines lamelles", "window": [160, 230] }
+  ],
+  "answers": { "good": 0, "bad": 2 }
+}

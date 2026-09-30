@@ -1,0 +1,52 @@
+[
+ {
+  "start": 0,
+  "end": 13.22,
+  "text": "ArrayMap, create a new array by calling a function on every element in a different array. Imagine we have an array of squares. We can call a function on every single one of those squares using map to convert it to a new array of circles."
+ },
+ {
+  "start": 13.22,
+  "end": 21.54,
+  "text": "In other words, it's just a loop, where the goal of that loop is to create a new array. In our code, let's start with an array of objects that contains some user data."
+ },
+ {
+  "start": 21.54,
+  "end": 33.96,
+  "text": "Our goal is to take this array of objects and convert it to an array of strings that only contain the user names. We could do this imperatively by creating a new empty array, then use a for loop to push each individual username to the new array."
+ },
+ {
+  "start": 33.96,
+  "end": 44.08,
+  "text": "Notice how we're using statements to change the app's state. This is known as imperative programming. Map on the other hand is declarative and describes how to create this new array using a function."
+ },
+ {
+  "start": 44.08,
+  "end": 53.32,
+  "text": "The new array is equal to the original array mapped to a function. The function is passed as an argument to map, and it's called on every element in the original array."
+ },
+ {
+  "start": 53.32,
+  "end": 61.26,
+  "text": "Our function has access to the current element in the loop as well as its index. In the body of the function, your job is to compute a new value and then return it."
+ },
+ {
+  "start": 61.26,
+  "end": 73.86,
+  "text": "And we've now solved the same problem we did with the for loop, but with less code and without mutating the internal state. If you're a React.js user, you'll often see map use to take some initial data and then map it to JSX for the actual UI."
+ },
+ {
+  "start": 73.86,
+  "end": 84.56,
+  "text": "Or maybe you need these user names to do something asynchronously like fetch additional data from the database. You could do that by mapping them all to an array of promises, then running them concurrently with promise.all."
+ },
+ {
+  "start": 84.56,
+  "end": 93.80000000000001,
+  "text": "One anti-pattern to be aware of with map is that you should only use it if you plan on using the new array. If you just need to run a loop, consider for each, or a regular for loop instead."
+ },
+ {
+  "start": 93.80000000000001,
+  "end": 98.72000000000001,
+  "text": "This has been ArrayMap in 100 seconds. Thanks for watching, and I will see you in the next one."
+ }
+]

@@ -1,0 +1,11 @@
+{
+  "url": "https://www.youtube.com/watch?v=DC471a9qrU4",
+  "kind": "no subtitles — local whisper",
+  "via": "whisper",
+  "questions": [
+    { "q": "map is declarative imperative programming", "window": [30, 50] },
+    { "q": "anti-pattern only use map if you use the new array", "window": [80, 95] },
+    { "q": "access to the current element and its index", "window": [50, 62] }
+  ],
+  "answers": { "good": 0, "bad": 2 }
+}
