@@ -1,0 +1,49 @@
+name: Evals (network)
+
+# The network suite reads the four eval videos again through yt-dlp — manual
+# subtitles, French auto-captions, a whisper transcription, a code tutorial —
+# and asks the same questions of the fresh runs. YouTube throttles and changes,
+# and datacenter addresses are often asked to sign in, so this is report-only:
+# it runs weekly and on dispatch to surface drift, and never gates a PR.
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  network-evals:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install yt-dlp, ffmpeg and uv (whisper)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          pipx install yt-dlp
+          pipx install uv
+      - name: Build the bundle
+        run: pnpm run build
+      - name: Doctor
+        run: node scripts/ultrawatch.mjs doctor || true
+      - name: Network evals (report-only)
+        run: |
+          set -o pipefail
+          pnpm run eval:network 2>&1 | tee eval-network-report.txt
+      - name: Publish the report to the run summary
+        if: always()
+        run: |
+          { echo '```'; cat eval-network-report.txt 2>/dev/null || echo "no report produced"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the network report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: eval-network-report
+          path: eval-network-report.txt
+          if-no-files-found: ignore
