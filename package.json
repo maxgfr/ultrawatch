@@ -1,7 +1,7 @@
 {
   "name": "ultrawatch",
   "version": "1.0.0",
-  "description": "Watch YouTube for the agent: turn a video, a playlist or a channel into timestamped, chaptered transcripts and on-screen frames, answer questions without re-reading the video, and check that every claim cites a [V# mm:ss] stamp that exists. Local and keyless: yt-dlp, the video's own subtitles, local whisper. A skills.sh agent skill.",
+  "description": "Watch videos for the agent — YouTube, Vimeo, Dailymotion and anything yt-dlp reads: turn a video, a playlist or a channel into timestamped, chaptered transcripts and on-screen frames, answer questions without re-reading the video, and check that every claim cites a [V# mm:ss] stamp that exists. Local and keyless: yt-dlp, the video's own subtitles, local whisper. A skills.sh agent skill.",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "bin": {
@@ -62,7 +62,7 @@
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11",
-    "@maxgfr/webindex": "https://codeload.github.com/maxgfr/webindex/tar.gz/80dfa81ec4a52a3abddadfc161957191bdf65ac8"
+    "@maxgfr/webindex": "https://codeload.github.com/maxgfr/webindex/tar.gz/ed1b57866529534a5b106be0157f12e4c7164b5b"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
