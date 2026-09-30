@@ -106,7 +106,7 @@ describe("the surface", () => {
     expect(await run(["frames", "x", "--effort", "max"])).toBe(2);
     expect(await run(["fetch", "u", "--limt", "3"])).toBe(2);
     expect(await run(["search", "q", "--limit", "0"])).toBe(2);
-    expect(await run(["check", TED, "a.md", "--videos", "not-an-id"])).toBe(2);
+    expect(await run(["check", TED, "a.md", "--videos", "../x"])).toBe(2);
   });
 });
 
@@ -168,7 +168,7 @@ describe("list and frames", () => {
   it("fails a listing that names no playlist, or reads nothing", async () => {
     setVideoDeps({ run: corpusRunner, have: () => true });
     expect(await run(["list", "https://youtu.be/jNQXAC9IVRw", "--out", dir])).toBe(1);
-    expect(stderr()).toContain("not a YouTube playlist or channel URL");
+    expect(stderr()).toContain("not a playlist or channel URL");
     expect(await run(["list"])).toBe(2);
   });
 
@@ -180,6 +180,37 @@ describe("list and frames", () => {
     expect(await run(["frames", "jNQXAC9IVRw", "--out", dir])).toBe(1);
     expect(stderr()).toContain("frames need ffmpeg");
     expect(await run(["frames"])).toBe(2);
+  });
+
+  it("reads a Vimeo link through its player, keeps it as vimeo-<id>, and checks an answer with --videos", async () => {
+    const calls: string[][] = [];
+    setVideoDeps({
+      run: async (cmd, args, opts) => {
+        calls.push(args);
+        if (args.includes("-J"))
+          return {
+            ok: true,
+            status: 0,
+            stdout: JSON.stringify({
+              ...zoo,
+              id: "76979871",
+              extractor_key: "Vimeo",
+              title: "The New Vimeo Player",
+              webpage_url: "https://player.vimeo.com/video/76979871",
+            }),
+            stderr: "",
+          };
+        return ytdlp(cmd, args, opts);
+      },
+      have: () => true,
+    });
+    expect(await run(["fetch", "https://vimeo.com/76979871", "--out", dir])).toBe(0);
+    expect(calls[0]!.at(-1)).toBe("https://player.vimeo.com/video/76979871");
+    expect(stdout()).toContain(join(dir, "vimeo-76979871", "TRANSCRIPT.md"));
+    writeFileSync(join(dir, "a.md"), "Here we are in front of the elephants, the player shows [V1 00:01].\n");
+    out.length = 0;
+    expect(await run(["check", dir, join(dir, "a.md"), "--videos", "vimeo-76979871"])).toBe(0);
+    expect(await run(["check", dir, join(dir, "a.md"), "--videos", "../etc"])).toBe(2);
   });
 
   it("prints the transcript instead of writing it under ULTRAWATCH_NO_WRITE", async () => {

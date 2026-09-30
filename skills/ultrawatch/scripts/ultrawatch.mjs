@@ -28,7 +28,7 @@ import { join as join6 } from "path";
 import { promisify } from "util";
 import { gunzip } from "zlib";
 import { basename as basename2 } from "path";
-var ENGINE_VERSION = "1.25.0";
+var ENGINE_VERSION = "1.26.1";
 var DEFAULT_BRAND = {
   name: "webindex",
   envPrefix: "WEBINDEX",
@@ -195,6 +195,31 @@ var MAX_TOTAL_BYTES2 = 256 * 1024 * 1024;
 var MAX_OUTPUT_CHARS = 24 * 1024 * 1024;
 var EXCEL_EPOCH = Date.UTC(1899, 11, 30);
 var OLE_SIGNATURE2 = Buffer.from([208, 207, 17, 224, 161, 177, 26, 225]);
+var FNV_OFFSET_HI = 3421674724;
+var FNV_OFFSET_LO = 2216829733;
+var FNV_PRIME_LOW = 435;
+var laneHi = 0;
+var laneLo = 0;
+function fnvMix(s) {
+  let hi = laneHi;
+  let lo = laneLo;
+  for (let i = 0; i < s.length; i++) {
+    lo = (lo ^ s.charCodeAt(i)) >>> 0;
+    const bP = (lo & 65535) * FNV_PRIME_LOW;
+    const aP = (lo >>> 16) * FNV_PRIME_LOW + (bP >>> 16);
+    const carry = aP >>> 16;
+    hi = carry + Math.imul(hi, FNV_PRIME_LOW) + (lo << 8) >>> 0;
+    lo = ((aP & 65535) << 16 | bP & 65535) >>> 0;
+  }
+  laneHi = hi;
+  laneLo = lo;
+}
+function fnv1a64(s) {
+  laneHi = FNV_OFFSET_HI;
+  laneLo = FNV_OFFSET_LO;
+  fnvMix(s);
+  return BigInt(laneHi) << 32n | BigInt(laneLo);
+}
 var VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 var YOUTUBE_HOSTS = ["youtube.com", "youtube-nocookie.com"];
 function parse(url) {
@@ -205,9 +230,10 @@ function parse(url) {
     return void 0;
   }
 }
+var onHost = (host, domain) => host === domain || host.endsWith(`.${domain}`);
 function isYoutubeHost(host) {
   const h = host.toLowerCase();
-  return YOUTUBE_HOSTS.some((d) => h === d || h.endsWith(`.${d}`));
+  return YOUTUBE_HOSTS.some((d) => onHost(h, d));
 }
 function youtubeVideoId(url) {
   const u = parse(url);
@@ -227,6 +253,115 @@ function youtubeListKind(url) {
   if (u.searchParams.get("list")) return "playlist";
   if (/^\/(?:@[^/]+|channel\/[^/]+|c\/[^/]+|user\/[^/]+)/.test(u.pathname)) return "channel";
   return void 0;
+}
+var HOSTS = [
+  {
+    site: "vimeo",
+    domains: ["vimeo.com"],
+    // vimeo.com/<id>, vimeo.com/<id>/<hash> (unlisted), vimeo.com/channels/<c>/<id>,
+    // vimeo.com/groups/<g>/videos/<id>, player.vimeo.com/video/<id>.
+    video: /^\/(?:video\/|channels\/[^/]+\/|groups\/[^/]+\/videos\/)?(\d{5,})(?:\/([0-9a-f]{6,}))?\/?$/,
+    // The player URL, because vimeo.com's own page now answers yt-dlp with a
+    // login wall while the player serves a public video — and its subtitles.
+    canonical: (m, u) => {
+      const hash = m[2] ?? u.searchParams.get("h") ?? void 0;
+      return { id: m[1], url: `https://player.vimeo.com/video/${m[1]}${hash ? `?h=${hash}` : ""}` };
+    }
+  },
+  {
+    site: "dailymotion",
+    domains: ["dailymotion.com"],
+    video: /^\/(?:embed\/)?video\/([a-z0-9]{5,})(?:_[^/]*)?\/?$/i,
+    canonical: (m) => ({ id: m[1], url: `https://www.dailymotion.com/video/${m[1]}` })
+  },
+  {
+    site: "dailymotion",
+    domains: ["dai.ly"],
+    video: /^\/([a-z0-9]{5,})\/?$/i,
+    canonical: (m) => ({ id: m[1], url: `https://www.dailymotion.com/video/${m[1]}` })
+  },
+  // Where the URL names the video, its key does too: a video read once is
+  // reused with no yt-dlp call at all, as on YouTube.
+  {
+    site: "twitch",
+    domains: ["twitch.tv"],
+    video: /^\/videos\/(\d+)\/?$/,
+    canonical: (m) => ({ id: m[1], url: `https://www.twitch.tv/videos/${m[1]}` })
+  },
+  { site: "twitch", domains: ["twitch.tv"], video: /^\/[^/]+\/clip\/[^/]+\/?$/ },
+  {
+    site: "ted",
+    domains: ["ted.com"],
+    video: /^\/talks\/([\w-]+)\/?$/,
+    canonical: (m) => ({ id: m[1], url: `https://www.ted.com/talks/${m[1]}` })
+  },
+  {
+    site: "loom",
+    domains: ["loom.com"],
+    video: /^\/(?:share|embed)\/([0-9a-f]{16,})\/?$/,
+    canonical: (m) => ({ id: m[1], url: `https://www.loom.com/share/${m[1]}` })
+  },
+  {
+    site: "tiktok",
+    domains: ["tiktok.com"],
+    video: /^\/(@[^/]+)\/video\/(\d+)\/?$/,
+    canonical: (m) => ({ id: m[2], url: `https://www.tiktok.com/${m[1]}/video/${m[2]}` })
+  },
+  { site: "instagram", domains: ["instagram.com"], video: /^\/(?:reel|reels|tv)\/[\w-]+\/?$/ },
+  { site: "facebook", domains: ["facebook.com"], video: /^\/(?:[^/]+\/videos\/[^/]+|reel\/\d+)\/?$/ },
+  { site: "facebook", domains: ["fb.watch"], video: /^\/[\w-]{6,}\/?$/ },
+  {
+    site: "x",
+    domains: ["x.com", "twitter.com"],
+    video: /^\/([^/]+)\/status\/(\d+)(?:\/video\/\d)?\/?$/,
+    canonical: (m) => ({ id: m[2], url: `https://x.com/${m[1]}/status/${m[2]}` })
+  },
+  { site: "bilibili", domains: ["bilibili.com"], video: /^\/video\/(?:BV\w+|av\d+)\/?$/i },
+  { site: "rumble", domains: ["rumble.com"], video: /^\/v[\w-]+\.html$/ },
+  { site: "peertube", domains: ["framatube.org", "tilvids.com"], video: /^\/(?:w|videos\/watch)\/[\w-]+\/?$/ }
+];
+var safeKey = (site, id) => `${site}-${id}`.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 120);
+var shortHash = (text) => fnv1a64(text).toString(16).padStart(16, "0").slice(0, 8);
+function knownVideo(url) {
+  const id = youtubeVideoId(url);
+  if (id) return { site: "youtube", url: `https://www.youtube.com/watch?v=${id}`, key: id };
+  const u = parse(url);
+  if (!u) return void 0;
+  const host = u.hostname.toLowerCase();
+  for (const rule of HOSTS) {
+    if (!rule.domains.some((d) => onHost(host, d))) continue;
+    const m = rule.video.exec(u.pathname);
+    if (!m) continue;
+    if (!rule.canonical) return { site: rule.site, url: u.toString() };
+    const c = rule.canonical(m, u);
+    return { site: rule.site, url: c.url, key: safeKey(rule.site, c.id) };
+  }
+  return void 0;
+}
+function videoSource(url, opts = {}) {
+  const known = knownVideo(url);
+  if (known) return known;
+  if (!opts.anySite) return void 0;
+  const u = parse(url);
+  return u ? { site: "web", url: u.toString() } : void 0;
+}
+function videoRunKey(site, id, pageUrl) {
+  if (site === "youtube" && VIDEO_ID.test(id)) return id;
+  const key = safeKey(site, id);
+  const altered = key !== `${site}-${id}`;
+  return site === "web" || altered ? `${key.slice(0, 110)}-${shortHash(pageUrl ?? id)}` : key;
+}
+function videoUrlAt(webpageUrl, seconds3) {
+  const t = Math.max(0, Math.floor(seconds3));
+  const u = parse(webpageUrl);
+  if (!u) return webpageUrl;
+  const host = u.hostname.toLowerCase();
+  if (isYoutubeHost(host) || host === "youtu.be") u.searchParams.set("t", `${t}s`);
+  else if (onHost(host, "vimeo.com")) u.hash = `t=${t}s`;
+  else if (onHost(host, "dailymotion.com")) u.searchParams.set("start", String(t));
+  else if (onHost(host, "twitch.tv")) u.searchParams.set("t", `${Math.floor(t / 3600)}h${Math.floor(t % 3600 / 60)}m${t % 60}s`);
+  else return webpageUrl;
+  return u.toString();
 }
 var STDOUT_CAP = 24 * 1024 * 1024;
 var defaultTimeoutMs = () => envInt("SH_TIMEOUT_MS", 6e4, 1e3);
@@ -303,14 +438,38 @@ function ytdlpExtraArgs() {
   return (env("YTDLP_ARGS") ?? "").split(/\s+/).filter(Boolean);
 }
 function runYtdlp(args, opts = {}) {
-  const argv = [...args, ...ytdlpExtraArgs(), ...opts.url ? ["--", opts.url] : []];
+  const strict = opts.knownOnly ? ["--use-extractors", "default,-generic"] : [];
+  const argv = [...strict, ...args, ...ytdlpExtraArgs(), ...opts.url ? ["--", opts.url] : []];
   return (opts.run ?? defaultVideoRunner)("yt-dlp", argv, { timeoutMs: opts.timeoutMs ?? PROBE_TIMEOUT_MS, signal: opts.signal });
 }
 var str = (v) => typeof v === "string" && v.trim() ? v.trim() : void 0;
+var httpUrl = (v) => v && /^https?:\/\//i.test(v) ? v : void 0;
 var num = (v) => typeof v === "number" && Number.isFinite(v) ? v : void 0;
-function videoMetaFromInfo(info) {
+function siteOf(extractor) {
+  const e = extractor.toLowerCase().split(":")[0].replace(/[^a-z0-9]/g, "");
+  const known = [
+    ["youtube", "youtube"],
+    ["vimeo", "vimeo"],
+    ["dailymotion", "dailymotion"],
+    ["twitch", "twitch"],
+    ["twitter", "x"],
+    ["ted", "ted"],
+    ["loom", "loom"],
+    ["tiktok", "tiktok"],
+    ["instagram", "instagram"],
+    ["facebook", "facebook"],
+    ["bilibili", "bilibili"],
+    ["rumble", "rumble"],
+    ["peertube", "peertube"]
+  ];
+  if (!e || e === "generic") return "web";
+  return known.find(([prefix]) => e.startsWith(prefix))?.[1] ?? e;
+}
+function videoMetaFromInfo(info, sourceUrl) {
   const id = str(info.id);
   if (!id) return void 0;
+  const site = siteOf(str(info.extractor_key) ?? str(info.extractor) ?? "youtube");
+  const webpageUrl = httpUrl(str(info.webpage_url)) ?? httpUrl(str(info.original_url)) ?? httpUrl(sourceUrl) ?? `https://www.youtube.com/watch?v=${id}`;
   const date = str(info.upload_date);
   const tracks = (v) => v && typeof v === "object" ? Object.keys(v).filter((k) => k !== "live_chat") : [];
   const duration = num(info.duration);
@@ -321,6 +480,8 @@ function videoMetaFromInfo(info) {
   })).filter((c) => c.title) : [];
   return {
     id,
+    site,
+    key: videoRunKey(site, id, webpageUrl),
     title: str(info.title) ?? id,
     channel: str(info.channel) ?? str(info.uploader),
     uploadDate: date && /^\d{8}$/.test(date) ? `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6)}` : void 0,
@@ -329,19 +490,21 @@ function videoMetaFromInfo(info) {
     chapters,
     subtitles: tracks(info.subtitles),
     autoCaptions: tracks(info.automatic_captions),
-    webpageUrl: str(info.webpage_url) ?? `https://www.youtube.com/watch?v=${id}`,
+    webpageUrl,
     ...info.live_status === "is_live" || info.is_live === true ? { live: "live" } : {},
     ...info.live_status === "is_upcoming" ? { live: "upcoming" } : {}
   };
 }
-async function probeVideo(url, run2 = defaultVideoRunner, signal) {
-  const r = await runYtdlp(["-J", "--skip-download", "--no-playlist", "--no-warnings"], { run: run2, url, signal });
+async function probeVideo(url, run2 = defaultVideoRunner, signal, knownOnly = false) {
+  const r = await runYtdlp(["-J", "--skip-download", "--no-playlist", "--no-warnings"], { run: run2, url, signal, knownOnly });
   if (signal?.aborted) return { error: "cancelled" };
   if (r.missing) return { error: "install yt-dlp (https://github.com/yt-dlp/yt-dlp) to read videos", missing: true };
   if (!r.ok) return { error: classifyYtdlpError(r.stderr) };
   try {
-    const meta = videoMetaFromInfo(JSON.parse(r.stdout));
-    return meta ? { meta, info: r.stdout } : { error: "yt-dlp returned no video for this URL" };
+    const parsed = JSON.parse(r.stdout);
+    if (parsed?._type === "playlist") return { error: "a list of videos, not one \u2014 read it with `video list`" };
+    const meta = parsed ? videoMetaFromInfo(parsed, url) : void 0;
+    return meta ? { meta, info: r.stdout } : { error: "no video at this URL (yt-dlp found none)" };
   } catch {
     return { error: "yt-dlp returned unreadable metadata" };
   }
@@ -350,6 +513,9 @@ function classifyYtdlpError(stderr) {
   const s = stderr || "";
   const unblock = `update yt-dlp (\`${brand().cli} doctor\` shows how old it is) or set ${envName("YTDLP_ARGS")}="--cookies-from-browser firefox"`;
   if (/private video/i.test(s)) return "private video";
+  if (/logged-in|log(?:ged)? ?in (?:is )?required|login required|requires? (?:a )?login|--username and --password|account credentials/i.test(s)) {
+    return `the site asks yt-dlp to log in \u2014 ${envName("YTDLP_ARGS")}="--cookies-from-browser firefox" passes your browser's session`;
+  }
   if (/members[- ]only|join this channel/i.test(s)) return "members-only video";
   if (/confirm your age|age[- ]restricted|inappropriate for some users/i.test(s)) {
     return `age-restricted video \u2014 it needs a signed-in session: ${envName("YTDLP_ARGS")}="--cookies-from-browser firefox"`;
@@ -358,6 +524,8 @@ function classifyYtdlpError(stderr) {
   if (/has been removed|account .*terminated|no longer available|copyright claim/i.test(s)) return "video removed";
   if (/unavailable|not available/i.test(s)) return "video unavailable";
   if (/timed out after/i.test(s)) return "yt-dlp timed out";
+  if (/DRM protected/i.test(s)) return "the site serves this video under DRM: its picture and sound cannot be downloaded (subtitles still can)";
+  if (/unsupported url|no video (?:formats|could be found)|no media found|there's no video/i.test(s)) return "no video at this URL (yt-dlp found none)";
   const line = s.split("\n").map((l) => l.trim()).find((l) => l.startsWith("ERROR:"));
   return `yt-dlp failed: ${(line ?? s.trim().split("\n")[0] ?? "").replace(/^ERROR:\s*/, "").slice(0, 200) || "no output"}`;
 }
@@ -369,7 +537,7 @@ async function withTempDir(label, fn) {
     rmSync2(dir, { recursive: true, force: true });
   }
 }
-async function downloadSubtitle(info, lang, auto, run2 = defaultVideoRunner, signal) {
+async function downloadSubtitle(info, lang, auto, run2 = defaultVideoRunner, signal, knownOnly = false) {
   return withTempDir("subs", async (dir) => {
     const infoPath = join2(dir, "info.json");
     writeFileSync2(infoPath, info);
@@ -383,13 +551,13 @@ async function downloadSubtitle(info, lang, auto, run2 = defaultVideoRunner, sig
         "--sub-langs",
         lang,
         "--sub-format",
-        "vtt",
+        "vtt/srt",
         "-o",
         join2(dir, "sub.%(ext)s")
       ],
-      { run: run2, timeoutMs: SUBTITLE_TIMEOUT_MS, signal }
+      { run: run2, timeoutMs: SUBTITLE_TIMEOUT_MS, signal, knownOnly }
     );
-    const file = readdirSync2(dir).find((f) => f.endsWith(".vtt"));
+    const file = readdirSync2(dir).find((f) => f.endsWith(".vtt")) ?? readdirSync2(dir).find((f) => f.endsWith(".srt"));
     if (file) return { vtt: readFileSync3(join2(dir, file), "utf8") };
     if (signal?.aborted) return { error: "cancelled" };
     return { error: r.ok ? `yt-dlp wrote no ${lang} track` : classifyYtdlpError(r.stderr) };
@@ -408,7 +576,13 @@ async function downloadMedia(args, dir, stem, opts) {
   let stderr = "";
   for (let attempt = 0; attempt < 2; attempt++) {
     const timeoutMs = typeof opts.timeoutMs === "function" ? opts.timeoutMs() : opts.timeoutMs;
-    const r = await runYtdlp([...args, "--no-warnings", "-o", join2(dir, `${stem}.%(ext)s`)], { run: opts.run, url: opts.url, timeoutMs, signal: opts.signal });
+    const r = await runYtdlp([...args, "--no-warnings", "-o", join2(dir, `${stem}.%(ext)s`)], {
+      run: opts.run,
+      url: opts.url,
+      timeoutMs,
+      signal: opts.signal,
+      knownOnly: opts.knownOnly
+    });
     if (opts.signal?.aborted) return { error: "cancelled" };
     if (r.status === 124) return { error: "timed out", timedOut: true };
     const file = r.ok ? readdirSync2(dir).find((f) => f.startsWith(`${stem}.`) && !/\.part(?:-Frag\d+)?$|\.ytdl$|\.f\d+\.\w+$/.test(f)) : void 0;
@@ -417,10 +591,10 @@ async function downloadMedia(args, dir, stem, opts) {
   }
   return { error: classifyYtdlpError(stderr) };
 }
-var TIMING = /^((?:\d+:)?\d{1,2}:\d{2}\.\d{3})\s+-->\s+((?:\d+:)?\d{1,2}:\d{2}\.\d{3})/;
+var TIMING = /^((?:\d+:)?\d{1,2}:\d{2}[.,]\d{3})\s+-->\s+((?:\d+:)?\d{1,2}:\d{2}[.,]\d{3})/;
 var MIN_CUE_S = 0.05;
 function seconds(stamp) {
-  const parts = stamp.split(":").map(Number);
+  const parts = stamp.replace(",", ".").split(":").map(Number);
   return parts.reduce((acc, p) => acc * 60 + p, 0);
 }
 var ENTITIES2 = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", lrm: "", rlm: "" };
@@ -433,10 +607,11 @@ function decode(text) {
     return ENTITIES2[name.toLowerCase()] ?? whole2;
   });
 }
-var clean = (line) => decode(line.replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
+var clean = (line) => decode(line.replace(/<[^>]*>/g, "").replace(/\{\\[^}]*\}/g, "")).replace(/\s+/g, " ").trim();
 function parseVtt(src, opts = {}) {
   const text = src.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
-  if (!/^WEBVTT/.test(text)) return [];
+  const srt = !/^WEBVTT/.test(text) && /^\s*\d+[ \t]*\n\d{2}:\d{2}:\d{2}[,.]\d{3}\s+-->/.test(text);
+  if (!/^WEBVTT/.test(text) && !srt) return [];
   const rolling = opts.rolling ?? (/<\d{2}:\d{2}[:.]\d/.test(text) || /<c>/.test(text));
   const out = [];
   let shown = [];
@@ -497,6 +672,7 @@ var DEFAULT_MAX = 3;
 var DEFAULT_TIMEOUT_MS2 = 30 * 6e4;
 var DEFAULT_MODEL = "small";
 var PYAV_PIN = "av<18";
+var AUDIO_FORMAT = "bestaudio/best";
 var spent2 = 0;
 function whisperBudgetLeft() {
   return Math.max(0, envInt("WHISPER_MAX", DEFAULT_MAX) - spent2);
@@ -520,7 +696,7 @@ function whisperLanguage(tag) {
   const base2 = tag?.toLowerCase().split(/[-_]/)[0];
   return base2 && /^[a-z]{2,3}$/.test(base2) ? base2 : void 0;
 }
-async function whisperTranscribe(info, language, run2, signal) {
+async function whisperTranscribe(info, language, run2, signal, knownOnly = false) {
   if (whisperBudgetLeft() <= 0) return { declined: "budget" };
   spent2++;
   const refund = (r) => {
@@ -534,7 +710,7 @@ async function whisperTranscribe(info, language, run2, signal) {
   return withTempDir("whisper", async (dir) => {
     const infoPath = join3(dir, "info.json");
     writeFileSync3(infoPath, info);
-    const dl = await downloadMedia(["--load-info-json", infoPath, "-f", "bestaudio/best"], dir, "audio", { run: run2, timeoutMs: left, signal });
+    const dl = await downloadMedia(["--load-info-json", infoPath, "-f", AUDIO_FORMAT], dir, "audio", { run: run2, timeoutMs: left, signal, knownOnly });
     if (signal?.aborted) return refund({ failed: "whisper: cancelled" });
     if ("timedOut" in dl) return timedOut;
     if ("error" in dl) return refund({ failed: `whisper: the audio download failed (${dl.error})` });
@@ -613,7 +789,7 @@ var chapterStarts = (meta) => meta.chapters.map((c) => c.start);
 async function subtitleRung(auto, meta, info, opts, deps) {
   const track = auto ? pickAutoTrack(meta) : pickManualTrack(meta, opts.lang);
   if (!track) return { failure: auto ? "no auto-captions in the video's language" : "no manual subtitles", noTrack: true };
-  const got = await downloadSubtitle(info, track, auto, deps.run, opts.signal);
+  const got = await downloadSubtitle(info, track, auto, deps.run, opts.signal, opts.knownHostsOnly);
   if ("error" in got) return { failure: `${auto ? "auto-captions" : "subtitles"} (${track}): ${got.error}` };
   return { segments: mergeSegments(parseVtt(got.vtt, { rolling: auto }), chapterStarts(meta)), track };
 }
@@ -621,7 +797,7 @@ async function whisperRung(meta, info, opts, deps) {
   const missing = ["uvx", "ffmpeg"].filter((c) => !deps.have(c));
   if (missing.length) return { failure: "whisper needs uvx and ffmpeg", unavailable: true };
   if (whisperBudgetLeft() <= 0) return { failure: `this run's whisper budget is spent (raise ${envName("WHISPER_MAX")})` };
-  const r = await whisperTranscribe(info, meta.language, deps.run, opts.signal);
+  const r = await whisperTranscribe(info, meta.language, deps.run, opts.signal, opts.knownHostsOnly);
   if ("segments" in r) return { segments: mergeSegments(r.segments, chapterStarts(meta)) };
   if ("declined" in r) return { failure: `this run's whisper budget is spent (raise ${envName("WHISPER_MAX")})` };
   return { failure: r.failed, unavailable: r.unavailable };
@@ -635,12 +811,12 @@ async function transcribeVideo(url, opts = {}) {
     ...meta2 ? { meta: meta2 } : {},
     reason: reason2
   });
-  const id = youtubeVideoId(url);
-  if (!id) return none(`not a YouTube video URL: ${url}`);
+  const source2 = videoSource(url, { anySite: !opts.knownHostsOnly });
+  if (!source2) return none(`not a video URL${opts.knownHostsOnly ? " on a known video host" : ""}: ${url}`);
   const deps = videoDeps(opts.deps);
   const rungs = enabledTranscribers(opts.engines);
   if (!rungs.length) return none(`every transcript rung is switched off (${envName("VIDEO_ENGINES")})`);
-  const probe = await probeVideo(`https://www.youtube.com/watch?v=${id}`, deps.run, opts.signal);
+  const probe = opts.probed ?? await probeVideo(source2.url, deps.run, opts.signal, opts.knownHostsOnly);
   if ("error" in probe) return none(probe.error);
   const { meta, info } = probe;
   if (meta.live) return none(`live stream ${meta.live === "live" ? "in progress" : "not started yet"} \u2014 read it once it has ended`, meta);
@@ -697,7 +873,9 @@ var paragraph = (s) => `[${formatStamp(s.start)}] ${s.text}`;
 var baseLang = (tag) => tag.toLowerCase().replace(/-orig$/, "").split(/[-_]/)[0];
 function source(t) {
   if (!t.via) return void 0;
-  const how = `${VIA_LABEL[t.via] ?? t.via} (${t.via}${t.track ? `, track ${t.track}` : ""})`;
+  const site = t.meta?.site ?? "youtube";
+  const label = t.via === "auto-subs" && site !== "youtube" ? `the site's auto-captions` : VIA_LABEL[t.via] ?? t.via;
+  const how = `${label} (${t.via}${t.track ? `, track ${t.track}` : ""})`;
   const spoken = t.meta?.language;
   if (t.track && spoken && baseLang(t.track) !== baseLang(spoken)) return `${how} \u2014 a translation: the video speaks ${spoken}`;
   return how;
@@ -1194,17 +1372,31 @@ function readVideoRun(dir) {
   return { meta, segments };
 }
 async function fetchVideoRun(url, root, opts = {}) {
-  const id = youtubeVideoId(url);
-  if (!id) return { ok: false, reason: `not a YouTube video URL: ${url}` };
+  const source2 = videoSource(url, { anySite: !opts.knownHostsOnly });
+  if (!source2) return { ok: false, reason: `not a video URL${opts.knownHostsOnly ? " on a known video host" : ""}: ${url}` };
+  const kept = (key) => {
+    const dir2 = join4(root, key);
+    const run2 = opts.refresh ? void 0 : readVideoRun(dir2);
+    if (!run2 || !existsSync3(join4(dir2, "TRANSCRIPT.md")) || !servesLang(run2.meta, opts.lang)) return void 0;
+    return { ok: true, id: key, dir: dir2, transcript: join4(dir2, "TRANSCRIPT.md"), reused: true, meta: run2.meta, segments: run2.segments.length };
+  };
+  if (source2.key) {
+    const reused = kept(source2.key);
+    if (reused) return reused;
+  }
+  let probed3;
+  if (!source2.key) {
+    const probe = await probeVideo(source2.url, videoDeps(opts.deps).run, opts.signal, opts.knownHostsOnly);
+    if ("error" in probe) return { ok: false, reason: probe.error };
+    const reused = kept(probe.meta.key ?? probe.meta.id);
+    if (reused) return reused;
+    probed3 = probe;
+  }
+  const t = await transcribeVideo(url, { ...opts, ...probed3 ? { probed: probed3 } : {} });
+  const id = source2.key ?? t.meta?.key ?? t.meta?.id;
+  if (!t.via || !t.meta || !id) return { ok: false, ...id ? { id } : {}, reason: t.reason ?? "no transcript" };
   const dir = join4(root, id);
   const transcriptPath = join4(dir, "TRANSCRIPT.md");
-  if (!opts.refresh) {
-    const kept = readVideoRun(dir);
-    if (kept && existsSync3(transcriptPath) && servesLang(kept.meta, opts.lang))
-      return { ok: true, id, dir, transcript: transcriptPath, reused: true, meta: kept.meta, segments: kept.segments.length };
-  }
-  const t = await transcribeVideo(url, opts);
-  if (!t.via || !t.meta) return { ok: false, id, reason: t.reason ?? "no transcript" };
   const meta = {
     ...t.meta,
     via: t.via,
@@ -1228,31 +1420,22 @@ async function fetchVideoRun(url, root, opts = {}) {
   return done;
 }
 var PASSAGE_S = 45;
-function videoPassages(segments, chapterStarts2 = []) {
+function passageGroups(segments, chapterStarts2) {
   const out = [];
-  let cur;
+  let cur = [];
   for (const s of segments) {
-    if (cur && chapterStarts2.some((b) => b > cur.start + 0.5 && b <= s.start + 0.5)) {
+    if (cur.length && chapterStarts2.some((b) => b > cur[0].start + 0.5 && b <= s.start + 0.5)) {
       out.push(cur);
-      cur = void 0;
+      cur = [];
     }
-    cur = cur ? { start: cur.start, end: s.end, text: `${cur.text} ${s.text}` } : { ...s };
-    if (cur.end - cur.start >= PASSAGE_S) {
+    cur.push(s);
+    if (s.end - cur[0].start >= PASSAGE_S) {
       out.push(cur);
-      cur = void 0;
+      cur = [];
     }
   }
-  if (cur) out.push(cur);
+  if (cur.length) out.push(cur);
   return out;
-}
-function videoUrlAt(webpageUrl, seconds3) {
-  try {
-    const u = new URL(webpageUrl);
-    u.searchParams.set("t", `${Math.floor(seconds3)}s`);
-    return u.toString();
-  } catch {
-    return webpageUrl;
-  }
 }
 function listVideoRuns(dir) {
   const self = readVideoRun(dir);
@@ -1286,31 +1469,39 @@ function searchVideoRuns(dir, query, opts = {}) {
   const docs = [];
   for (const run2 of listVideoRuns(dir)) {
     const { meta } = run2;
-    for (const p of videoPassages(
+    const key = meta.key ?? meta.id;
+    for (const parts of passageGroups(
       run2.segments,
       (meta.chapters ?? []).map((c) => c.start)
     )) {
-      const chapter = chapterAt(meta.chapters ?? [], p.start);
-      docs.push({
-        id: `${meta.id}@${p.start}`,
-        title: "",
-        headings: chapter ?? "",
-        body: p.text,
-        hit: {
-          label: labels.get(meta.id) ?? meta.id,
-          videoId: meta.id,
-          title: meta.title,
-          ...chapter ? { chapter } : {},
-          start: p.start,
-          stamp: formatStamp(p.start),
-          url: videoUrlAt(meta.webpageUrl, p.start),
-          text: p.text
-        }
-      });
+      const chapter = chapterAt(meta.chapters ?? [], parts[0].start);
+      docs.push({ id: `${key}@${parts[0].start}`, title: "", headings: chapter ?? "", body: parts.map((s) => s.text).join(" "), parts, meta, key, chapter });
     }
   }
   const index = buildBm25Index(query, docs);
-  return docs.map((d) => ({ ...d.hit, score: Math.round(bm25Score(index, d) * 1e3) / 1e3 })).filter((h) => h.score > 0).sort((a, b) => b.score - a.score || a.videoId.localeCompare(b.videoId) || a.start - b.start).slice(0, opts.limit ?? 10);
+  const scored = docs.map((d) => ({ d, score: Math.round(bm25Score(index, d) * 1e3) / 1e3 })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score || a.d.key.localeCompare(b.d.key) || a.d.parts[0].start - b.d.parts[0].start).slice(0, opts.limit ?? 10);
+  return scored.map(({ d, score }) => {
+    let best = d.parts[0];
+    let top = 0;
+    for (const s of d.parts) {
+      const sc = bm25Score(index, { id: `${d.id}#${s.start}`, title: "", headings: "", body: s.text });
+      if (sc > top) {
+        top = sc;
+        best = s;
+      }
+    }
+    return {
+      label: labels.get(d.key) ?? d.key,
+      videoId: d.key,
+      title: d.meta.title,
+      ...d.chapter ? { chapter: d.chapter } : {},
+      start: best.start,
+      stamp: formatStamp(best.start),
+      url: videoUrlAt(d.meta.webpageUrl, best.start),
+      text: d.body,
+      score
+    };
+  });
 }
 var BEFORE_S = 5;
 var AFTER_S = 10;
@@ -1366,6 +1557,7 @@ function dhashStream(raw) {
 }
 var FRAME_EFFORT = { low: 20, med: 50, high: 100 };
 var SCENE_THRESHOLD = 0.3;
+var VIDEO_FORMAT = "bv*[height<=720]/b[height<=720]/bv*/b";
 var FRAMES_TIMEOUT_MS = 30 * 6e4;
 var MIN_FRAMES = 3;
 var INTERVAL_FRAMES = 10;
@@ -1404,11 +1596,14 @@ async function extractFrames(runDir, opts = {}) {
   if (!deps.have("ffmpeg")) return { ok: false, reason: "frames need ffmpeg" };
   const effort = opts.effort ?? "med";
   const { meta, segments } = run2;
+  const source2 = videoSource(opts.url ?? meta.webpageUrl, { anySite: !opts.knownHostsOnly });
+  if (!source2) return { ok: false, reason: `the run in ${runDir} names no page this may download the video from` };
   const duration = meta.duration ?? 0;
   return withTempDir("frames", async (tmp) => {
-    const dl = await downloadMedia(["-f", "bv*[height<=720]/b[height<=720]/bv*/b", "--no-playlist"], tmp, "video", {
+    const dl = await downloadMedia(["-f", VIDEO_FORMAT, "--no-playlist"], tmp, "video", {
       run: deps.run,
-      url: `https://www.youtube.com/watch?v=${meta.id}`,
+      url: source2.url,
+      knownOnly: opts.knownHostsOnly,
       timeoutMs: FRAMES_TIMEOUT_MS,
       signal: opts.signal
     });
@@ -1522,14 +1717,16 @@ function listingUrl(url) {
   return u.toString();
 }
 async function listVideos(url, opts = {}) {
-  const kind = youtubeListKind(url);
-  if (!kind) return { error: `not a YouTube playlist or channel URL: ${url}` };
+  const u = /^https?:\/\//i.test(url) ? url : void 0;
+  if (!u || !youtubeListKind(url) && (opts.knownHostsOnly || knownVideo(url)))
+    return { error: `not a playlist or channel URL${opts.knownHostsOnly ? " on YouTube" : ""}: ${url}` };
   const limit = Math.max(1, Math.trunc(opts.limit ?? DEFAULT_LIMIT));
   const r = await runYtdlp(["--flat-playlist", "-J", "--playlist-end", String(limit), "--no-warnings"], {
     run: videoDeps(opts.deps).run,
     url: listingUrl(url),
     timeoutMs: LIST_TIMEOUT_MS,
-    signal: opts.signal
+    signal: opts.signal,
+    knownOnly: opts.knownHostsOnly
   });
   if (r.missing) return { error: "install yt-dlp (https://github.com/yt-dlp/yt-dlp) to read videos" };
   if (!r.ok) return { error: classifyYtdlpError(r.stderr) };
@@ -1537,11 +1734,20 @@ async function listVideos(url, opts = {}) {
     const info = JSON.parse(r.stdout);
     const videos = (info.entries ?? []).flatMap((e) => {
       const id = typeof e.id === "string" ? e.id : "";
-      const watch = `https://www.youtube.com/watch?v=${id}`;
-      if (e._type === "playlist" || typeof e.ie_key === "string" && e.ie_key !== "Youtube" || !youtubeVideoId(watch)) return [];
-      return [{ id, title: typeof e.title === "string" ? e.title : id, ...typeof e.duration === "number" ? { duration: e.duration } : {}, url: watch }];
+      const ie = typeof e.ie_key === "string" ? e.ie_key : "";
+      if (!id || e._type === "playlist" || /tab|playlist|channel|user|album|showcase/i.test(ie)) return [];
+      const title = typeof e.title === "string" ? e.title : id;
+      const duration = typeof e.duration === "number" ? { duration: e.duration } : {};
+      if (youtubeListKind(url)) {
+        const watch = `https://www.youtube.com/watch?v=${id}`;
+        return (ie === "" || ie === "Youtube") && youtubeVideoId(watch) ? [{ id, key: id, title, ...duration, url: watch }] : [];
+      }
+      const entryUrl = [e.url, e.webpage_url].find((v) => typeof v === "string" && /^https?:\/\//i.test(v));
+      if (!entryUrl || opts.knownHostsOnly && !knownVideo(entryUrl)) return [];
+      const known = knownVideo(entryUrl);
+      return [{ id, ...known?.key ? { key: known.key } : {}, title, ...duration, url: known?.url ?? entryUrl }];
     });
-    const unique = videos.filter((v, i) => videos.findIndex((w) => w.id === v.id) === i);
+    const unique = videos.filter((v, i) => videos.findIndex((w) => w.url === v.url) === i);
     return { ...info.title ? { title: info.title } : {}, videos: unique.slice(0, limit) };
   } catch {
     return { error: "yt-dlp returned an unreadable listing" };
@@ -1575,14 +1781,19 @@ function corpusMarkdown(c, root) {
 }
 async function fetchVideoCorpus(url, root, opts = {}) {
   if (isNoWrite()) return { ok: false, reason: "a corpus is kept on disk, and nothing may be written (NO_WRITE)" };
-  const listed = await listVideos(url, { limit: opts.limit, deps: opts.deps, signal: opts.signal });
+  const listed = await listVideos(url, { limit: opts.limit, deps: opts.deps, signal: opts.signal, knownHostsOnly: opts.knownHostsOnly });
   if ("error" in listed) return { ok: false, reason: listed.error };
   if (!listed.videos.length) return { ok: false, reason: `no videos listed at ${url}` };
   let done = 0;
   const videos = await mapLimit(listed.videos, CORPUS_CONCURRENCY, async (v, i) => {
     const r = await fetchVideoRun(v.url, root, { ...opts });
-    opts.onVideo?.(++done, listed.videos.length, v.title);
-    const base2 = { label: `V${i + 1}`, id: v.id, title: r.ok ? r.meta.title : v.title, ...v.duration !== void 0 ? { duration: v.duration } : {} };
+    opts.onVideo?.(++done, listed.videos.length, r.ok ? r.meta.title : v.title);
+    const base2 = {
+      label: `V${i + 1}`,
+      id: r.ok ? r.id : v.key ?? v.id,
+      title: r.ok ? r.meta.title : v.title,
+      ...v.duration !== void 0 ? { duration: v.duration } : {}
+    };
     return r.ok ? { ...base2, ...r.meta.duration !== void 0 ? { duration: r.meta.duration } : {}, via: r.meta.via, dir: r.dir, reused: r.reused } : { ...base2, reason: r.reason };
   });
   const corpus = { source: url, ...listed.title ? { title: listed.title } : {}, createdAt: (/* @__PURE__ */ new Date()).toISOString(), videos };
@@ -2399,7 +2610,8 @@ var VERSION = "1.0.0";
 
 // src/cli.ts
 var HELP = `ultrawatch v${VERSION} (webindex ${ENGINE_VERSION})
-Watch YouTube for an agent: a video, a playlist or a channel turned into
+Watch videos for an agent \u2014 YouTube, Vimeo, Dailymotion and anything yt-dlp
+reads: a video, a playlist or a channel turned into
 timestamped transcripts and on-screen frames, kept on disk, searchable, and
 checked \u2014 every claim cites a [V# mm:ss] stamp that exists. Local and keyless.
 
@@ -2417,7 +2629,7 @@ COMMANDS
            per chapter, a [mm:ss] stamp per paragraph), segments.json and
            meta.json. Manual subtitles, else the video's own auto-captions
            (never a machine translation), else a local whisper transcription.
-           A video already on disk is reused without touching YouTube;
+           A video already on disk is reused without touching the site;
            --refresh reads it again, --lang picks the subtitle language.
   search   Rank ~45 s passages of every video under the directory \u2014 or of a
            corpus, labelled V1\u2026Vn \u2014 against a question: each with its stamp,
@@ -2467,7 +2679,8 @@ function videoList(args) {
   const raw = argValue(args, "videos");
   if (raw === void 0) return void 0;
   const ids = raw.split(",").map((s) => s.trim()).filter(Boolean);
-  if (!ids.length || ids.some((id) => !/^[\w-]{11}$/.test(id))) usage(`--videos takes YouTube video ids separated by commas, not "${raw}"`);
+  if (!ids.length || ids.some((id) => !/^[\w.-]{1,120}$/.test(id) || id.startsWith(".")))
+    usage(`--videos takes run keys \u2014 YouTube ids, or site-id like vimeo-76979871 \u2014 separated by commas, not "${raw}"`);
   return ids;
 }
 function citeLabels(root, videos) {
@@ -2528,7 +2741,7 @@ async function run(args) {
     const effort = argValue(args, "effort") ?? "med";
     if (!(effort in FRAME_EFFORT)) usage(`--effort must be low, med or high, not "${effort}"`);
     let runDir;
-    if (youtubeVideoId(target)) {
+    if (/^https?:\/\//i.test(target)) {
       const r2 = await fetchVideoRun(target, root, { lang: argValue(args, "lang") });
       if (!r2.ok) fail(`no transcript for ${target}: ${r2.reason}`);
       runDir = r2.dir;

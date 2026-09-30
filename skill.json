@@ -4,11 +4,11 @@
   "engines": {
     "webindex": {
       "repo": "maxgfr/webindex",
-      "minRef": "v1.25.0",
+      "minRef": "v1.26.0",
       "meta": "webindex.meta.json"
     }
   },
-  "usageFloor": 39,
+  "usageFloor": 38,
   "forks": {},
   "allowedForeignFlags": [
     "cookies-from-browser"
