@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the [Conventional Commits](https://www.conventionalcommits.org/) by [semantic-release](https://github.com/semantic-release/semantic-release).
 
+## [1.1.1](https://github.com/maxgfr/ultrawatch/compare/v1.1.0...v1.1.1) (2026-10-01)
+
+
+### Bug Fixes
+
+* **skill:** give the answer and transcript by absolute path ([759d949](https://github.com/maxgfr/ultrawatch/commit/759d949ac9f54ed180843f90bd887598df81c37e))
+
 # [1.1.0](https://github.com/maxgfr/ultrawatch/compare/v1.0.0...v1.1.0) (2026-09-30)
 
 
