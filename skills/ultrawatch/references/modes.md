@@ -6,8 +6,10 @@ touches the site again.
 
 ## Summary
 
-1. `fetch`, then read `TRANSCRIPT.md` **whole** — a summary built from search
-   hits misses what the video spends most of its time on.
+1. `fetch`, then read `TRANSCRIPT.md` **whole**, through its last stamp — a
+   summary built from search hits misses what the video spends most of its
+   time on. When the output comes back truncated or compressed, read the file
+   again in line ranges until every paragraph has been seen.
 2. Follow the chapters when there are any: they are the author's own outline.
    Weight them by length; a two-minute sponsor segment is not a third of the
    video.

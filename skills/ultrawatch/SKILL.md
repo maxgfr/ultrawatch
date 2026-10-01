@@ -33,15 +33,18 @@ write points at the second of the video that says it.
 
 ## Run it
 
-The bundle is self-contained — Node ≥ 18, no install. From the skill directory:
+The bundle is self-contained — Node ≥ 18, no install. Call it by absolute path:
+`<skill-dir>` is the directory holding this file, and every `ultrawatch …`
+below stands for `node <skill-dir>/scripts/ultrawatch.mjs …`.
 
 ```bash
-node scripts/ultrawatch.mjs doctor                          # yt-dlp (required), ffmpeg, uvx
-node scripts/ultrawatch.mjs fetch "<youtube-url>" --json    # → <dir>/<id>/TRANSCRIPT.md
+node <skill-dir>/scripts/ultrawatch.mjs doctor                          # yt-dlp (required), ffmpeg, uvx
+node <skill-dir>/scripts/ultrawatch.mjs fetch "<url>" --out <dir> --json  # → <dir>/<id>/TRANSCRIPT.md
 ```
 
-Use the same `--out <dir>` for every command of one task, so fetch, search,
-frames and check all see the same runs.
+Pick one absolute `--out <dir>` per task and pass it to every command, so
+fetch, search, frames and check all see the same runs. Without it, runs land in
+`<tmp>/ultrawatch/video`, which the system may clear.
 
 ## Routing
 
@@ -90,9 +93,14 @@ check failing), 2 the invocation was wrong.
 2. Cite the segment's own stamp — the one `TRANSCRIPT.md` or `search` shows —
    not a stamp you estimate.
 3. Quote sparingly and exactly; mark auto-caption or whisper transcripts.
-4. Write it to a file, run `ultrawatch check <run> <answer.md>`, fix, repeat.
+4. Write it to `<dir>/answer.md`, beside the runs; run
+   `ultrawatch check <run> <dir>/answer.md`, fix, repeat until it passes.
 5. End with the video's link, and the links a claim most depends on
    (`search` gives `…&t=Ns`).
+6. Give the user every file by its absolute path: the answer, and each video's
+   full transcript (`<dir>/<id>/TRANSCRIPT.md`) for reading beyond the answer.
+   Say when `<dir>` sits under a temporary directory, and offer to copy them
+   somewhere lasting.
 
 ## Will not
 
