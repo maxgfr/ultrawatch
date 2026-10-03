@@ -4,7 +4,7 @@ description: Watch videos for the user — YouTube, Vimeo, Dailymotion and anyth
 disable-model-invocation: true
 license: MIT
 metadata:
-  version: 1.1.2
+  version: 1.1.3
   opencode/autoinvoke: 'false'
 ---
 

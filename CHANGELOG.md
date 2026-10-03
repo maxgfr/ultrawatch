@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the [Conventional Commits](https://www.conventionalcommits.org/) by [semantic-release](https://github.com/semantic-release/semantic-release).
 
+## [1.1.3](https://github.com/maxgfr/ultrawatch/compare/v1.1.2...v1.1.3) (2026-10-03)
+
+
+### Bug Fixes
+
+* **engine:** update shared engines and maintenance tool ([6dfb327](https://github.com/maxgfr/ultrawatch/commit/6dfb327defa1e752032b1c07c2f40729de091617))
+
 ## [1.1.2](https://github.com/maxgfr/ultrawatch/compare/v1.1.1...v1.1.2) (2026-10-02)
 
 
