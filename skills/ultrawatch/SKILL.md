@@ -1,11 +1,10 @@
 ---
 name: ultrawatch
-description: Watch videos for the user — YouTube, Vimeo, Dailymotion and anything yt-dlp reads — and answer from what they actually say and show — a summary, the visuals, a follow-up question on a video already watched, or several videos at once (a playlist, a channel) — every claim citing a [V# mm:ss] stamp checked against the transcript. Use when the user shares a video link or asks "summarize this video", "what does he say about…", "what's on screen", "compare these videos", "résume cette vidéo", "que dit-il sur…", "qu'est-ce qu'on voit", "compare ces vidéos", "regarde cette playlist". Local and keyless — yt-dlp, the video's own subtitles, local whisper.
-disable-model-invocation: true
+description: Watch videos for the user — YouTube, Vimeo, Dailymotion and anything yt-dlp reads — and answer from what they actually say and show — a summary, the visuals, a follow-up question on a video already watched, or several videos at once (a playlist, a channel) — every claim citing a [V# mm:ss] stamp checked against the transcript. Use only when the user explicitly asks for ultrawatch or for a video to be watched, e.g. "summarize this video", "what does he say about…", "what's on screen", "compare these videos", "résume cette vidéo", "que dit-il sur…", "qu'est-ce qu'on voit", "compare ces vidéos", "regarde cette playlist". Local and keyless — yt-dlp, the video's own subtitles, local whisper.
 license: MIT
 metadata:
   version: 1.1.3
-  opencode/autoinvoke: 'false'
+  opencode/autoinvoke: 'true'
 ---
 
 # ultrawatch — watch the video, cite the second

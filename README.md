@@ -16,8 +16,10 @@ npx skills add maxgfr/ultrawatch
 
 ## Invocation
 
-In Claude Code, Codex or any [skills.sh](https://skills.sh) agent, the skill is
-invoked explicitly: `/ultrawatch` followed by a link and what you want.
+In Claude Code, Codex or any [skills.sh](https://skills.sh) agent, the skill runs
+on request: `/ultrawatch` followed by a link and what you want, or simply asking
+the agent to watch or summarize a video. It never starts on its own — see
+[On request or explicit-only](#on-request-or-explicit-only).
 
 ```
 /ultrawatch summarize https://www.youtube.com/watch?v=iG9CE55wbtY
@@ -98,9 +100,25 @@ How it works, in depth: [DOCUMENTATION.md](DOCUMENTATION.md). Contributing: [CON
 
 MIT.
 
-## Manual or automatic
+## On request or explicit-only
 
-The skill is explicit-only (`disable-model-invocation: true`): it runs when you
-call `/ultrawatch`, never on its own. Install it with `npx skills add
-maxgfr/ultrawatch`, or use the bundle directly: `node
+The skill ships **model-invocable, on request**: the agent may call it through
+its skill tool, but the skill's description restricts it to explicit requests,
+so the agent calls it when you ask, not on its own. Install it with `npx skills
+add maxgfr/ultrawatch`, or use the bundle directly: `node
 skills/ultrawatch/scripts/ultrawatch.mjs --help`.
+
+Making it explicit-only is one setting per host, applied to the **installed**
+copy of the skill:
+
+| Host | Shipped, on request | Explicit-only |
+| --- | --- | --- |
+| Claude Code | no `disable-model-invocation` in `SKILL.md` | add `disable-model-invocation: true` |
+| Codex | `allow_implicit_invocation: true` under `policy:` in `agents/openai.yaml` | set it to `false` |
+| OpenCode | `metadata.opencode/autoinvoke: 'true'` in `SKILL.md` | set it to `'false'` |
+
+Claude Code can do it without touching the file:
+`"skillOverrides": { "ultrawatch": "user-invocable-only" }` in `settings.json`
+leaves `/ultrawatch` working while hiding the skill from the model. Plugin installs
+ignore `skillOverrides`, so edit the frontmatter there. Updating or reinstalling
+the skill restores the shipped default, so reapply the change afterwards.
