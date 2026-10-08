@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the [Conventional Commits](https://www.conventionalcommits.org/) by [semantic-release](https://github.com/semantic-release/semantic-release).
 
+# [1.2.0](https://github.com/maxgfr/ultrawatch/compare/v1.1.3...v1.2.0) (2026-10-08)
+
+
+### Features
+
+* **skill:** let the agent invoke ultrawatch on request ([87584b3](https://github.com/maxgfr/ultrawatch/commit/87584b319e5155d06029443dbcb49087ddd832da))
+
 ## [1.1.3](https://github.com/maxgfr/ultrawatch/compare/v1.1.2...v1.1.3) (2026-10-03)
 
 
