@@ -28,6 +28,8 @@ Commit `src/`, `scripts/ultrawatch.mjs` and `skills/ultrawatch/scripts/ultrawatc
 
 Editing `SKILL.md` or `references/*.md` needs no rebuild, but keep the description ≤ 1000 characters and every reference linked (`verify:bundle` enforces both), and document no flag the CLI does not accept.
 
+To try the in-repo skill with your agent, `npx skills add .` installs it from `skills/ultrawatch/` (add `-a <agent>` to target one). The install output (`.agents/skills/`, `.claude/skills/`, `skills-lock.json`) is gitignored — never commit it.
+
 ## Commits & releases
 
 Conventional Commits drive [semantic-release](https://github.com/semantic-release/semantic-release): `fix:` → patch, `feat:` → minor, `feat!:`/`BREAKING CHANGE:` → major. A push to `main` runs the gate (typecheck / lint / test / `check:build` / evals) and, if green, cuts a GitHub Release and bumps the version across `package.json`, `src/version.ts` and `SKILL.md` in lockstep.
