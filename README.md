@@ -110,12 +110,12 @@ so the agent calls it when you ask, not on its own. Install it with `npx skills
 add maxgfr/ultrawatch`, or use the bundle directly: `node
 skills/ultrawatch/scripts/ultrawatch.mjs --help`.
 
-Making it explicit-only is one setting per host, applied to the **installed**
-copy of the skill:
+Making it explicit-only is one setting, read by Claude Code and OpenCode,
+applied to the **installed** copy of the skill:
 
 | Host | Shipped, on request | Explicit-only |
 | --- | --- | --- |
-| Claude Code | no `disable-model-invocation` in `SKILL.md` | add `disable-model-invocation: true` |
+| Claude Code, OpenCode | no `disable-model-invocation` in `SKILL.md` | add `disable-model-invocation: true` |
 
 Claude Code can do it without touching the file:
 `"skillOverrides": { "ultrawatch": "user-invocable-only" }` in `settings.json`
