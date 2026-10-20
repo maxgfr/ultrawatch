@@ -4,7 +4,6 @@ description: Watch videos for the user — YouTube, Vimeo, Dailymotion and anyth
 license: MIT
 metadata:
   version: 1.2.1
-  opencode/autoinvoke: 'true'
 ---
 
 # ultrawatch — watch the video, cite the second
