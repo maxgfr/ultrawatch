@@ -14,6 +14,8 @@ subtitles, and whisper running on your machine. No API and no key.
 npx skills add maxgfr/ultrawatch
 ```
 
+Works with any skills-compatible agent; add `-a <agent>` (e.g. `-a codex`, `-a opencode`) to target one explicitly.
+
 ## Invocation
 
 In Claude Code, Codex or any [skills.sh](https://skills.sh) agent, the skill runs
