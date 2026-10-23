@@ -72,7 +72,7 @@ works from text that carries a stamp on every paragraph.
 | `ultrawatch doctor` | yt-dlp and its age, ffmpeg, uvx, the whisper model, the rungs, the run directory. |
 
 `fetch`, `search`, `frames` and `list` take `--out <dir>` (the default is
-`ULTRAWATCH_VIDEO_DIR`, else `<tmp>/ultrawatch/video`); every command takes
+`ULTRAWATCH_VIDEO_DIR`, else `<tmp>/ultrawatch-<uid>/video`); every command takes
 `--json`. Requirements:
 
 - Node ≥ 18 and yt-dlp, which is required.
@@ -119,6 +119,5 @@ applied to the **installed** copy of the skill:
 
 Claude Code can do it without touching the file:
 `"skillOverrides": { "ultrawatch": "user-invocable-only" }` in `settings.json`
-leaves `/ultrawatch` working while hiding the skill from the model. Plugin installs
-ignore `skillOverrides`, so edit the frontmatter there. Updating or reinstalling
-the skill restores the shipped default, so reapply the change afterwards.
+leaves `/ultrawatch` working while hiding the skill from the model. Updating or
+reinstalling the skill restores the shipped default, so reapply the change afterwards.
