@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the [Conventional Commits](https://www.conventionalcommits.org/) by [semantic-release](https://github.com/semantic-release/semantic-release).
 
+## [1.2.2](https://github.com/maxgfr/ultrawatch/compare/v1.2.1...v1.2.2) (2026-10-23)
+
+
+### Bug Fixes
+
+* repin webindex to v1.34.1 and expect its per-uid video directory ([#18](https://github.com/maxgfr/ultrawatch/issues/18)) ([7f23723](https://github.com/maxgfr/ultrawatch/commit/7f23723d317715865bbfdb98a12ae015d9b16b35))
+
 ## [1.2.1](https://github.com/maxgfr/ultrawatch/compare/v1.2.0...v1.2.1) (2026-10-09)
 
 
