@@ -42,7 +42,7 @@ node <skill-dir>/scripts/ultrawatch.mjs fetch "<url>" --out <dir> --json  # → 
 
 Pick one absolute `--out <dir>` per task and pass it to every command, so
 fetch, search, frames and check all see the same runs. Without it, runs land in
-`<tmp>/ultrawatch/video`, which the system may clear.
+`<tmp>/ultrawatch-<uid>/video`, which the system may clear.
 
 ## Routing
 

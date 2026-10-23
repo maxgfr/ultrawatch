@@ -80,7 +80,7 @@ COMMANDS
   doctor   yt-dlp (and how old it is), ffmpeg, uvx, the whisper model, the
            transcript rungs, and where runs are kept.
 
-The directory is --out, else ULTRAWATCH_VIDEO_DIR, else <tmp>/ultrawatch/video.
+The directory is --out, else ULTRAWATCH_VIDEO_DIR, else <tmp>/ultrawatch-<uid>/video.
 
 ENVIRONMENT
   ULTRAWATCH_VIDEO_DIR      where runs are kept

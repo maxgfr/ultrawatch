@@ -48,7 +48,7 @@ manual track in another language than the video's is marked as a translation.
 
 | Variable | Sets |
 |---|---|
-| `ULTRAWATCH_VIDEO_DIR` | where runs are kept (default `<tmp>/ultrawatch/video`) |
+| `ULTRAWATCH_VIDEO_DIR` | where runs are kept (default `<tmp>/ultrawatch-<uid>/video`) |
 | `ULTRAWATCH_VIDEO_ENGINES` | the rungs, in order: `manual-subs,auto-subs,whisper`, or `none` |
 | `ULTRAWATCH_WHISPER_MODEL` | whisper's model (default `small`, ~500 MB the first time) |
 | `ULTRAWATCH_WHISPER_MAX` | videos one process may transcribe locally (default 3) |

@@ -125,13 +125,15 @@ describe("fetch and search", () => {
     expect(await run(["search", "giraffes", "--out", dir])).toBe(1);
   });
 
-  it("uses <tmp>/ultrawatch/video when neither --out nor the variable says otherwise", async () => {
+  it("uses <tmp>/ultrawatch-<uid>/video when neither --out nor the variable says otherwise", async () => {
     delete process.env.ULTRAWATCH_VIDEO_DIR;
     setVideoDeps({ run: async () => ({ ok: false, status: 1, stdout: "", stderr: "ERROR: [youtube] x: Private video" }), have: () => true });
     expect(await run(["fetch", "https://youtu.be/jNQXAC9IVRw"])).toBe(1);
     expect(stderr()).toContain("no transcript for https://youtu.be/jNQXAC9IVRw: private video");
     expect(await run(["doctor", "--json"])).toBeLessThanOrEqual(1);
-    expect(JSON.parse(stdout()).videoDir).toBe(join(tmpdir(), "ultrawatch", "video"));
+    // Per-user, so two accounts on one machine never share (or fight over) a run directory.
+    const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
+    expect(JSON.parse(stdout()).videoDir).toBe(join(tmpdir(), uid === undefined ? "ultrawatch" : `ultrawatch-${uid}`, "video"));
   });
 });
 
