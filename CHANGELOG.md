@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the [Conventional Commits](https://www.conventionalcommits.org/) by [semantic-release](https://github.com/semantic-release/semantic-release).
 
+# [1.3.0](https://github.com/maxgfr/ultrawatch/compare/v1.2.5...v1.3.0) (2026-11-07)
+
+
+### Features
+
+* read video files already on disk ([3228e3f](https://github.com/maxgfr/ultrawatch/commit/3228e3f4c976d227fd407f2f44bb55788f89ae0a))
+
 ## [1.2.5](https://github.com/maxgfr/ultrawatch/compare/v1.2.4...v1.2.5) (2026-10-30)
 
 
