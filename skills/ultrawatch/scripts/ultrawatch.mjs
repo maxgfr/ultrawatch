@@ -1343,12 +1343,12 @@ function enabledTranscribers(engines) {
   return engines ?? enginesFromEnv("VIDEO_ENGINES", VIDEO_TRANSCRIBERS) ?? VIDEO_TRANSCRIBERS;
 }
 function assessTranscript(segments, duration) {
-  const words2 = segments.reduce((n, s) => n + s.text.split(/\s+/).filter(Boolean).length, 0);
-  if (!words2) return { ok: false, reason: "empty transcript" };
+  const words3 = segments.reduce((n, s) => n + s.text.split(/\s+/).filter(Boolean).length, 0);
+  if (!words3) return { ok: false, reason: "empty transcript" };
   if (duration && duration > 60) {
-    const minutes = duration / 60;
-    if (words2 / minutes < MIN_WORDS_PER_MINUTE) {
-      return { ok: false, reason: `transcript too sparse: ${words2} words over ${Math.round(minutes)} min \u2014 music or a silent video?` };
+    const minutes2 = duration / 60;
+    if (words3 / minutes2 < MIN_WORDS_PER_MINUTE) {
+      return { ok: false, reason: `transcript too sparse: ${words3} words over ${Math.round(minutes2)} min \u2014 music or a silent video?` };
     }
   }
   return { ok: true };
@@ -5478,8 +5478,8 @@ function isHeaderRow(cells) {
 }
 function tableToMarkdown(table) {
   const width = table.rows.reduce((w, r) => Math.max(w, r.length), Math.max(table.headers.length, 1));
-  const esc2 = (s) => s.replace(/\|/g, "\\|");
-  const line = (cells) => `| ${Array.from({ length: width }, (_, i) => esc2(cells[i] ?? "")).join(" | ")} |`;
+  const esc3 = (s) => s.replace(/\|/g, "\\|");
+  const line = (cells) => `| ${Array.from({ length: width }, (_, i) => esc3(cells[i] ?? "")).join(" | ")} |`;
   const out = [];
   if (table.caption) out.push(`**${table.caption}**`, "");
   out.push(line(table.headers.length ? table.headers : Array.from({ length: width }, () => "")));
@@ -6408,8 +6408,8 @@ function isContentContainer(open2) {
   const attrs = htmlAttributes(open2);
   for (const token of `${attrs.get("id") ?? ""} ${attrs.get("class") ?? ""}`.toLowerCase().split(/\s+/)) {
     if (token === "markdown-body") return true;
-    const words2 = token.split(/\W+/);
-    if (words2.some((w) => CONTENT_WORDS.has(w)) && !words2.some((w) => CHROME_WORDS.has(w))) return true;
+    const words3 = token.split(/\W+/);
+    if (words3.some((w) => CONTENT_WORDS.has(w)) && !words3.some((w) => CHROME_WORDS.has(w))) return true;
   }
   return false;
 }
@@ -8449,6 +8449,238 @@ function judge(tok, videos, line) {
 import { existsSync as existsSync8, readFileSync as readFileSync9 } from "fs";
 import { dirname, isAbsolute, join as join12, relative, sep as sep2 } from "path";
 import { pathToFileURL } from "url";
+
+// src/stamps.ts
+function stampSeconds2(stamp) {
+  if (!/^\d{1,2}(?::\d{2}){1,2}$/.test(stamp)) return void 0;
+  return stamp.split(":").reduce((n, p) => n * 60 + Number(p), 0);
+}
+
+// src/overview.ts
+var esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+var words2 = (s) => s.split(/\s+/).filter(Boolean).length;
+function citedSeconds(md) {
+  const out = [];
+  for (const m of md.matchAll(/\[((?:V\d+|M)\b[^\]]*)\]/g)) {
+    let video = "";
+    for (const part of m[1].split(/[;,]/)) {
+      const p = /^\s*(?:(V\d+)\s+)?(\d{1,2}(?::\d{2}){1,2})\s*$/.exec(part);
+      const v = /^\s*(V\d+)/.exec(part)?.[1];
+      if (v) video = v;
+      if (!p) continue;
+      const t = stampSeconds2(p[2]);
+      if (t !== void 0 && (!video || video === "V1")) out.push(t);
+    }
+  }
+  return out;
+}
+function summarySections(md) {
+  const out = [];
+  let cur;
+  const close = () => {
+    if (cur) out.push({ title: cur.title, stamps: citedSeconds(cur.lines.join("\n")) });
+  };
+  for (const line of md.split("\n")) {
+    const h = /^##\s+(.*)$/.exec(line);
+    if (h) {
+      close();
+      cur = { title: h[1].replace(/\s*\[[^\]]*\]/g, "").trim(), lines: [] };
+    } else cur?.lines.push(line);
+  }
+  close();
+  return out;
+}
+var median = (xs) => {
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)];
+};
+function videoParts(duration, chapters, summary) {
+  if (!(duration > 0)) return [];
+  if (chapters.length) {
+    const cs = [...chapters].sort((a, b) => a.start - b.start);
+    return cs.map((c, i) => ({ title: c.title, start: c.start, end: cs[i + 1]?.start ?? duration }));
+  }
+  if (!summary) return [];
+  const kept = [];
+  for (const s of summarySections(summary)) {
+    const st = s.stamps.filter((t) => t <= duration);
+    if (st.length < 2) continue;
+    const lo = Math.min(...st);
+    const hi = Math.max(...st);
+    if (hi - lo > duration * 0.5) continue;
+    const mid = median(st);
+    const prev = kept[kept.length - 1];
+    if (prev && mid <= prev.mid) continue;
+    kept.push({ title: s.title, start: Math.max(lo, prev ? prev.start + 1 : 0), mid });
+  }
+  if (kept.length < 2) return [];
+  kept[0].start = 0;
+  return kept.map((k, i) => ({ title: k.title, start: k.start, end: kept[i + 1]?.start ?? duration }));
+}
+function speechRate(segments, duration, bins = 120) {
+  const n = Math.max(1, Math.min(bins, Math.ceil(duration / 30)));
+  const width = duration / n;
+  const count = new Array(n).fill(0);
+  for (const s of segments) {
+    const w = words2(s.text);
+    const a = Math.max(0, s.start);
+    const b = Math.min(duration, Math.max(s.end, a + 0.01));
+    for (let i = Math.floor(a / width); i < n && i * width < b; i++) {
+      const overlap = Math.min(b, (i + 1) * width) - Math.max(a, i * width);
+      if (overlap > 0) count[i] += w * overlap / (b - a);
+    }
+  }
+  return { width, rate: count.map((c) => c * 60 / width) };
+}
+var seekAttr = (t) => `data-t="${Math.floor(t)}"`;
+var pct = (x, d) => `${(x / d * 100).toFixed(3)}%`;
+var minutes = (s) => Math.round(s / 60);
+function overviewHtml(o, L) {
+  const { duration, segments } = o;
+  if (!(duration > 0) || !segments.length) return "";
+  const parts = videoParts(duration, o.chapters, o.summary);
+  const cited = o.summary ? [...new Set(citedSeconds(o.summary).filter((t) => t <= duration))].sort((a, b) => a - b) : [];
+  const spoken = segments.reduce((n, s) => n + words2(s.text), 0);
+  const tiles = [
+    [formatStamp(duration), L.duration],
+    parts.length ? [String(parts.length), L.parts] : void 0,
+    cited.length ? [String(cited.length), L.cited] : void 0,
+    [spoken.toLocaleString(L.locale), L.words],
+    [String(Math.round(spoken / (duration / 60))), `${L.rate} (${L.perMin})`]
+  ].filter((t) => !!t);
+  const out = [`<section class="overview viz" aria-label="${esc(L.overview)}">`, `<h2 class="kicker">${esc(L.overview)}</h2>`];
+  out.push(
+    `<div class="tiles">${tiles.map(([v, k]) => `<div class="tile"><span class="v">${esc(v)}</span><span class="k">${esc(k)}</span></div>`).join("")}</div>`
+  );
+  out.push(`<figure class="chart"><figcaption><strong>${esc(L.outline)}</strong> <span>${esc(L.outlineNote)}</span></figcaption>`);
+  out.push(`<div class="strip" role="group" aria-label="${esc(L.outline)}">`);
+  if (parts.length)
+    parts.forEach((p, i) => {
+      const tip = `${i + 1}. ${p.title} \u2014 ${formatStamp(p.start)}\u2013${formatStamp(p.end)} \xB7 ${minutes(p.end - p.start)} ${L.min}`;
+      out.push(
+        `<button type="button" class="seg-part stamp-like" ${seekAttr(p.start)} style="left:${pct(p.start, duration)};width:${pct(p.end - p.start, duration)}" data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span>${i + 1}</span></button>`
+      );
+    });
+  else out.push(`<span class="seg-part whole" style="left:0;width:100%"></span>`);
+  out.push(`<span class="playhead" hidden></span></div>`);
+  if (cited.length)
+    out.push(
+      `<div class="rug" aria-hidden="true">${cited.map((t) => `<button type="button" tabindex="-1" class="tick stamp-like" ${seekAttr(t)} style="left:${pct(t, duration)}" data-tip="${formatStamp(t)}"></button>`).join("")}</div>`
+    );
+  const ticks = axisTicks(duration);
+  out.push(`<div class="axis">${ticks.map((t) => `<span style="left:${pct(t, duration)}">${formatStamp(t)}</span>`).join("")}</div></figure>`);
+  if (parts.length) {
+    const longest = Math.max(...parts.map((p) => p.end - p.start));
+    out.push(`<figure class="chart"><figcaption><strong>${esc(L.partLength)}</strong></figcaption><ol class="bars">`);
+    parts.forEach((p, i) => {
+      const len = p.end - p.start;
+      const tip = `${p.title} \u2014 ${formatStamp(p.start)} \xB7 ${minutes(len)} ${L.min}`;
+      out.push(
+        `<li><button type="button" class="bar-row stamp-like" ${seekAttr(p.start)} data-tip="${esc(tip)}"><span class="bl"><b>${i + 1}</b> ${esc(p.title)}</span><span class="bt"><span class="bf" style="width:${pct(len, longest)}"></span><span class="bv">${minutes(len)} ${L.min}</span></span></button></li>`
+      );
+    });
+    out.push("</ol>");
+    out.push(
+      `<details class="table-view"><summary>${esc(L.table)}</summary><table><thead><tr><th>#</th><th>${esc(L.part)}</th><th>${esc(L.start)}</th><th>${esc(L.length)}</th></tr></thead><tbody>${parts.map(
+        (p, i) => `<tr><td>${i + 1}</td><td>${esc(p.title)}</td><td><button type="button" class="stamp" ${seekAttr(p.start)}>${formatStamp(p.start)}</button></td><td>${minutes(p.end - p.start)} ${L.min}</td></tr>`
+      ).join("")}</tbody></table></details></figure>`
+    );
+  }
+  const { width, rate } = speechRate(segments, duration);
+  const top = Math.max(60, Math.ceil(Math.max(...rate) / 50) * 50);
+  const W = 1e3;
+  const H = 120;
+  const x = (i) => (i + 0.5) / rate.length * W;
+  const y = (v) => H - v / top * H;
+  const line = rate.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  const area = `${line}L${x(rate.length - 1).toFixed(1)},${H}L${x(0).toFixed(1)},${H}Z`;
+  const avg = spoken / (duration / 60);
+  out.push(
+    `<figure class="chart rate" data-unit="${esc(L.perMin)}" data-bin="${width}" data-rates="${rate.map((r) => Math.round(r)).join(",")}"><figcaption><strong>${esc(L.speech)}</strong> <span>${esc(L.speechNote)}</span></figcaption>`,
+    `<div class="plot"><div class="yaxis"><span style="top:0">${top}</span><span style="top:50%">${top / 2}</span><span style="top:100%">0</span></div>`,
+    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(L.speech)}"><line class="grid" x1="0" x2="${W}" y1="${H / 2}" y2="${H / 2}"/><line class="grid" x1="0" x2="${W}" y1="0" y2="0"/><path class="area" d="${area}"/><path class="line" d="${line}"/><line class="avg" x1="0" x2="${W}" y1="${y(avg).toFixed(1)}" y2="${y(avg).toFixed(1)}"/><line class="cross" x1="0" x2="0" y1="0" y2="${H}" visibility="hidden"/></svg>`,
+    `</div><div class="axis">${ticks.map((t) => `<span style="left:${pct(t, duration)}">${formatStamp(t)}</span>`).join("")}</div></figure>`
+  );
+  out.push("</section>");
+  return out.join("\n");
+}
+function axisTicks(duration) {
+  const steps = [30, 60, 120, 300, 600, 900, 1800, 3600];
+  const step = steps.find((s) => duration / s <= 7) ?? 3600;
+  const out = [];
+  for (let t = 0; t <= duration - step * 0.4; t += step) out.push(t);
+  return out;
+}
+var OVERVIEW_CSS = `
+.overview{border-bottom:1px solid var(--line);padding-bottom:1.25rem;margin-bottom:1rem}
+.viz{--series:#2a78d6;--series-soft:rgba(42,120,214,.16);--grid:#e4e0d8}
+@media (prefers-color-scheme:dark){.viz{--series:#3987e5;--series-soft:rgba(57,135,229,.22);--grid:#2d2b27}}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(7.5rem,1fr));gap:.5rem;margin:.25rem 0 1.25rem}
+.tile{background:var(--soft);border-radius:8px;padding:.6rem .75rem;display:flex;flex-direction:column;gap:.1rem}
+.tile .v{font-size:1.35rem;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.2}
+.tile .k{font-size:.78rem;color:var(--muted)}
+.chart{margin:0 0 1.5rem}
+.chart figcaption{font-size:.9rem;margin-bottom:.5rem}.chart figcaption span{color:var(--muted);font-size:.82rem}
+.strip{position:relative;height:30px}
+.seg-part{position:absolute;top:0;height:100%;border:0;padding:0;background:var(--series);border-radius:4px;cursor:pointer;color:#fff;font:600 .72rem/1 ui-sans-serif,system-ui,sans-serif;box-shadow:0 0 0 1px var(--bg);overflow:hidden;opacity:.82}
+.seg-part:hover,.seg-part:focus-visible,.seg-part.on{opacity:1;outline:none;box-shadow:0 0 0 1px var(--bg),0 0 0 3px var(--series)}
+.seg-part.whole{background:var(--series-soft);cursor:default}
+.playhead{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--fg);border-radius:1px;pointer-events:none}
+.rug{position:relative;height:12px;margin-top:3px}
+.tick{position:absolute;top:0;width:2px;height:10px;margin-left:-1px;padding:0;border:0;border-radius:1px;background:var(--accent);cursor:pointer}
+.tick::before{content:"";position:absolute;inset:-4px -4px}
+.axis{position:relative;height:1.1rem;margin-top:.2rem;font:.7rem/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
+.axis span{position:absolute;transform:translateX(-50%);white-space:nowrap}.axis span:first-child{transform:none}
+.bars{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.bar-row{display:grid;grid-template-columns:minmax(9rem,38%) 1fr;gap:.75rem;align-items:center;width:100%;padding:.2rem .25rem;border:0;background:none;color:var(--fg);font:inherit;font-size:.84rem;text-align:left;cursor:pointer;border-radius:4px}
+.bar-row:hover,.bar-row:focus-visible,.bar-row.on{background:var(--soft);outline:none}
+.bl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bl b{color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums;margin-right:.25rem}
+.bt{display:flex;align-items:center;gap:.4rem;min-width:0}
+.bf{height:12px;background:var(--series);border-radius:0 4px 4px 0;min-width:2px}
+.bv{font-size:.75rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.table-view{margin-top:.5rem;font-size:.82rem}.table-view summary{cursor:pointer;color:var(--muted)}
+.plot{position:relative;padding-left:2.2rem}
+.plot svg{display:block;width:100%;height:120px;overflow:visible;cursor:crosshair}
+.yaxis{position:absolute;left:0;top:0;bottom:0;width:2rem;font:.68rem/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
+.yaxis span{position:absolute;right:.3rem;transform:translateY(-50%)}
+.rate .axis{margin-left:2.2rem}
+.grid{stroke:var(--grid);stroke-width:1;vector-effect:non-scaling-stroke}
+.area{fill:var(--series-soft)}
+.line{fill:none;stroke:var(--series);stroke-width:2;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.avg{stroke:var(--muted);stroke-width:1;stroke-dasharray:4 4;vector-effect:non-scaling-stroke}
+.cross{stroke:var(--fg);stroke-width:1;vector-effect:non-scaling-stroke}
+.tip{position:fixed;z-index:10;pointer-events:none;background:var(--fg);color:var(--bg);font-size:.78rem;line-height:1.35;padding:.35rem .5rem;border-radius:6px;max-width:22rem;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+`;
+var OVERVIEW_SCRIPT = `(() => {
+const tip = document.createElement("div");
+tip.className = "tip"; tip.hidden = true; document.body.append(tip);
+const fmt = (t) => { t = Math.max(0, Math.floor(t)); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60, p = (n) => String(n).padStart(2, "0"); return h ? h + ":" + p(m) + ":" + p(s) : p(m) + ":" + p(s); };
+function show(text, x, y) { tip.textContent = text; tip.hidden = false; const r = tip.getBoundingClientRect(); tip.style.left = Math.min(window.innerWidth - r.width - 8, x + 12) + "px"; tip.style.top = Math.max(8, y - r.height - 10) + "px"; }
+document.addEventListener("pointermove", (e) => { const el = e.target.closest?.("[data-tip]"); if (el) show(el.dataset.tip, e.clientX, e.clientY); else if (!e.target.closest?.(".rate svg")) tip.hidden = true; });
+document.addEventListener("focusin", (e) => { const el = e.target.closest?.("[data-tip]"); if (el) { const r = el.getBoundingClientRect(); show(el.dataset.tip, r.left, r.top); } });
+document.addEventListener("focusout", () => { tip.hidden = true; });
+const rate = document.querySelector(".rate");
+if (rate) {
+  const svg = rate.querySelector("svg"), cross = svg.querySelector(".cross"), bin = Number(rate.dataset.bin), rates = rate.dataset.rates.split(",").map(Number);
+  const at = (e) => { const r = svg.getBoundingClientRect(); return Math.min(rates.length - 1, Math.max(0, Math.floor((e.clientX - r.left) / r.width * rates.length))); };
+  svg.addEventListener("pointermove", (e) => { const i = at(e), x = (i + 0.5) / rates.length * 1000; cross.setAttribute("x1", x); cross.setAttribute("x2", x); cross.setAttribute("visibility", "visible"); show(fmt(i * bin) + "\u2013" + fmt((i + 1) * bin) + " \xB7 " + rates[i] + " " + rate.dataset.unit, e.clientX, e.clientY); });
+  svg.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); tip.hidden = true; });
+  svg.addEventListener("click", (e) => { const b = document.createElement("button"); b.className = "stamp"; b.dataset.t = Math.floor(at(e) * bin); b.hidden = true; document.body.append(b); b.click(); b.remove(); });
+}
+const player = document.getElementById("player");
+const strip = document.querySelector(".strip"), head = strip?.querySelector(".playhead"), total = Number(document.body.dataset.duration);
+const parts = [...document.querySelectorAll(".seg-part[data-t]")], rows = [...document.querySelectorAll(".bar-row")];
+function follow(t) {
+  if (!head || !(total > 0)) return;
+  head.hidden = false; head.style.left = (t / total * 100) + "%";
+  let k = -1; parts.forEach((p, i) => { if (Number(p.dataset.t) <= t + 0.5) k = i; });
+  parts.forEach((p, i) => p.classList.toggle("on", i === k)); rows.forEach((r, i) => r.classList.toggle("on", i === k));
+}
+if (player && player.tagName === "VIDEO") player.addEventListener("timeupdate", () => follow(player.currentTime));
+document.addEventListener("click", (e) => { const b = e.target.closest(".stamp, .stamp-like"); if (b && b.dataset.t) follow(Number(b.dataset.t)); }, true);
+})();`;
+
+// src/html.ts
 var LABELS = {
   en: {
     summary: "Summary",
@@ -8465,7 +8697,25 @@ var LABELS = {
     at: "Frame at",
     whisper: "local whisper transcription",
     passage: "passage",
-    passages: "passages"
+    passages: "passages",
+    overview: "Overview",
+    duration: "duration",
+    parts: "parts",
+    cited: "moments cited",
+    words: "words spoken",
+    rate: "speech rate",
+    perMin: "words/min",
+    outline: "Outline",
+    outlineNote: "each part of the video, and below it the moments the summary cites \u2014 click to jump there",
+    partLength: "Length of each part",
+    speech: "Speech rate",
+    speechNote: "words per minute across the video; the dashed line is the average, dips are pauses or inaudible passages",
+    table: "Show as a table",
+    part: "Part",
+    start: "Start",
+    length: "Length",
+    min: "min",
+    locale: "en-US"
   },
   fr: {
     summary: "R\xE9sum\xE9",
@@ -8482,23 +8732,37 @@ var LABELS = {
     at: "Image \xE0",
     whisper: "transcription whisper locale",
     passage: "passage",
-    passages: "passages"
+    passages: "passages",
+    overview: "Vue d'ensemble",
+    duration: "dur\xE9e",
+    parts: "parties",
+    cited: "moments cit\xE9s",
+    words: "mots prononc\xE9s",
+    rate: "d\xE9bit",
+    perMin: "mots/min",
+    outline: "D\xE9roul\xE9",
+    outlineNote: "chaque partie de la vid\xE9o, et dessous les moments cit\xE9s par le r\xE9sum\xE9 \u2014 cliquez pour y aller",
+    partLength: "Dur\xE9e de chaque partie",
+    speech: "D\xE9bit de parole",
+    speechNote: "mots par minute au fil de la vid\xE9o ; le pointill\xE9 est la moyenne, les creux sont des pauses ou des passages inaudibles",
+    table: "Voir en tableau",
+    part: "Partie",
+    start: "D\xE9but",
+    length: "Dur\xE9e",
+    min: "min",
+    locale: "fr-FR"
   }
 };
-var esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-function stampSeconds2(stamp) {
-  if (!/^\d{1,2}(?::\d{2}){1,2}$/.test(stamp)) return void 0;
-  return stamp.split(":").reduce((n, p) => n * 60 + Number(p), 0);
-}
-var seek = (t, label) => `<button type="button" class="stamp" data-t="${Math.floor(t)}">${esc(label)}</button>`;
+var esc2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+var seek = (t, label) => `<button type="button" class="stamp" data-t="${Math.floor(t)}">${esc2(label)}</button>`;
 function inline(raw) {
   const codes = [];
-  let s = esc(raw).replace(/`([^`]+)`/g, (_, c) => `\uE000${codes.push(c) - 1}\uE000`);
+  let s = esc2(raw).replace(/`([^`]+)`/g, (_, c) => `\uE000${codes.push(c) - 1}\uE000`);
   s = s.replace(/(\s?)\[((?:V\d+|M)\b[^\]]*)\](?:\((https?:[^)\s]+)\))?/g, (_, space, body) => {
     let video = "";
     const parts = body.split(/[;,]/).map((part) => {
       const m = /^\s*(?:(V\d+)\s+)?(M|\d{1,2}(?::\d{2}){1,2})\s*$/.exec(part);
-      if (!m) return esc(part.trim());
+      if (!m) return esc2(part.trim());
       video = m[1] ?? video;
       if (m[2] === "M") return "";
       const t = stampSeconds2(m[2]);
@@ -8586,14 +8850,14 @@ function player(meta, pageDir, L) {
   if (file)
     return {
       kind: "video",
-      html: `<video id="player" controls preload="metadata" src="${esc(href(file, pageDir))}"></video>${yt ? `<p class="fallback">${L.noPlay} <a href="${esc(meta.webpageUrl)}" target="_blank" rel="noopener">${L.onSite}</a></p>` : ""}`
+      html: `<video id="player" controls preload="metadata" src="${esc2(href(file, pageDir))}"></video>${yt ? `<p class="fallback">${L.noPlay} <a href="${esc2(meta.webpageUrl)}" target="_blank" rel="noopener">${L.onSite}</a></p>` : ""}`
     };
   if (yt)
     return {
       kind: "youtube",
       html: `<div class="frame"><iframe id="player" data-yt="${yt}" src="https://www.youtube-nocookie.com/embed/${yt}" title="YouTube" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`
     };
-  return { kind: "link", html: `<p><a id="player" href="${esc(meta.webpageUrl)}" target="_blank" rel="noopener">${L.open}</a></p>` };
+  return { kind: "link", html: `<p><a id="player" href="${esc2(meta.webpageUrl)}" target="_blank" rel="noopener">${L.open}</a></p>` };
 }
 function runHtml(runDir, opts) {
   const run2 = readVideoRun(runDir);
@@ -8607,6 +8871,7 @@ function runHtml(runDir, opts) {
   const L = lang === "fr" ? LABELS.fr : LABELS.en;
   const p = player(meta, pageDir, L);
   const summary = opts.summary ? markdownToHtml(opts.summary.replace(/^\s*#\s[^\n]*\n/, "")) : void 0;
+  const overview = overviewHtml({ duration: meta.duration ?? Math.max(0, ...segments.map((s) => s.end)), segments, chapters, summary: opts.summary }, L);
   const facts = [
     meta.channel,
     meta.uploadDate,
@@ -8619,39 +8884,39 @@ function runHtml(runDir, opts) {
   for (const s of segments) {
     while (c + 1 < chapters.length && chapters[c + 1].start <= s.start + 0.5) {
       c++;
-      body.push(`<h3 class="chapter" id="c${c}">${seek(chapters[c].start, formatStamp(chapters[c].start))} ${esc(chapters[c].title)}</h3>`);
+      body.push(`<h3 class="chapter" id="c${c}">${seek(chapters[c].start, formatStamp(chapters[c].start))} ${esc2(chapters[c].title)}</h3>`);
     }
     const shots = [];
     while (f < frames.length && frames[f].time < s.end + 0.5) {
       const fr = frames[f++];
       shots.push(
-        `<figure>${seek(fr.time, fr.stamp)}<img loading="lazy" src="${esc(href(join12(runDir, fr.file), pageDir))}" alt="${L.at} ${fr.stamp}"></figure>`
+        `<figure>${seek(fr.time, fr.stamp)}<img loading="lazy" src="${esc2(href(join12(runDir, fr.file), pageDir))}" alt="${L.at} ${fr.stamp}"></figure>`
       );
     }
     body.push(
-      `<p class="seg" data-start="${s.start}" data-end="${s.end}">${seek(s.start, formatStamp(s.start))} <span>${esc(s.text)}</span></p>${shots.length ? `<div class="shots">${shots.join("")}</div>` : ""}`
+      `<p class="seg" data-start="${s.start}" data-end="${s.end}">${seek(s.start, formatStamp(s.start))} <span>${esc2(s.text)}</span></p>${shots.length ? `<div class="shots">${shots.join("")}</div>` : ""}`
     );
   }
   const nav = [
-    summary?.toc.length ? `<h2>${L.summary}</h2><ol class="toc">${summary.toc.filter((t) => t.level <= 2).map((t) => `<li><a href="#${t.id}">${esc(t.title)}</a></li>`).join("")}</ol>` : "",
-    chapters.length ? `<h2>${L.chapters}</h2><ol class="toc">${chapters.map((ch, i) => `<li>${seek(ch.start, formatStamp(ch.start))} <a href="#c${i}">${esc(ch.title)}</a></li>`).join("")}</ol>` : "",
+    summary?.toc.length ? `<h2>${L.summary}</h2><ol class="toc">${summary.toc.filter((t) => t.level <= 2).map((t) => `<li><a href="#${t.id}">${esc2(t.title)}</a></li>`).join("")}</ol>` : "",
+    chapters.length ? `<h2>${L.chapters}</h2><ol class="toc">${chapters.map((ch, i) => `<li>${seek(ch.start, formatStamp(ch.start))} <a href="#c${i}">${esc2(ch.title)}</a></li>`).join("")}</ol>` : "",
     frames.length ? `<h2>${L.frames} (${frames.length})</h2><div class="thumbs">${frames.map(
-      (fr) => `<button type="button" class="stamp thumb" data-t="${Math.floor(fr.time)}" title="${fr.stamp}"><img loading="lazy" src="${esc(href(join12(runDir, fr.file), pageDir))}" alt="${fr.stamp}"></button>`
+      (fr) => `<button type="button" class="stamp thumb" data-t="${Math.floor(fr.time)}" title="${fr.stamp}"><img loading="lazy" src="${esc2(href(join12(runDir, fr.file), pageDir))}" alt="${fr.stamp}"></button>`
     ).join("")}</div>` : ""
   ].join("");
   const html = `<!DOCTYPE html>
-<html lang="${esc(lang)}">
+<html lang="${esc2(lang)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="ultrawatch">
-<title>${esc(meta.title)}</title>
-<style>${CSS}</style>
+<title>${esc2(meta.title)}</title>
+<style>${CSS}${OVERVIEW_CSS}</style>
 </head>
-<body data-player="${p.kind}" data-page="${esc(meta.webpageUrl)}" data-passage="${L.passage}" data-passages="${L.passages}">
+<body data-duration="${meta.duration ?? ""}" data-player="${p.kind}" data-page="${esc2(meta.webpageUrl)}" data-passage="${L.passage}" data-passages="${L.passages}">
 <header class="top">
-  <h1>${esc(meta.title)}</h1>
-  <p class="facts">${facts.map((x) => esc(String(x))).join(" \xB7 ")} \xB7 <a href="${esc(meta.webpageUrl)}" target="_blank" rel="noopener">${L.source}</a></p>
+  <h1>${esc2(meta.title)}</h1>
+  <p class="facts">${facts.map((x) => esc2(String(x))).join(" \xB7 ")} \xB7 <a href="${esc2(meta.webpageUrl)}" target="_blank" rel="noopener">${L.source}</a></p>
 </header>
 <div class="layout">
   <aside class="side">
@@ -8659,6 +8924,7 @@ function runHtml(runDir, opts) {
     <nav>${nav}</nav>
   </aside>
   <main>
+    ${overview}
     ${summary ? `<section class="summary"><h2 class="kicker">${L.summary}</h2>${summary.html}</section>` : ""}
     <section class="transcript">
       <div class="tbar"><h2 class="kicker">${L.transcript}</h2><input id="q" type="search" placeholder="${L.search}" aria-label="${L.searchAria}"><label><input id="follow" type="checkbox" checked> ${L.follow}</label><span id="count"></span></div>
@@ -8667,6 +8933,7 @@ function runHtml(runDir, opts) {
   </main>
 </div>
 <script>${SCRIPT}</script>
+<script>${OVERVIEW_SCRIPT}</script>
 </body>
 </html>
 `;
@@ -8685,7 +8952,7 @@ function go(t) {
   mark(t, true);
 }
 document.addEventListener("click", (e) => {
-  const b = e.target.closest(".stamp");
+  const b = e.target.closest(".stamp, .stamp-like");
   if (b) { e.preventDefault(); go(Number(b.dataset.t)); }
 });
 let current;
@@ -9001,10 +9268,12 @@ COMMANDS
            line-by-line report otherwise; an answer with no claim fails too.
   html     One self-contained page to watch and understand a video: the
            player (the local file when the run was read from disk, else the
-           site's embed), --summary rendered with every [V1 mm:ss] a button
-           that seeks the player, the chapters, the frames, and the whole
-           transcript, searchable and following playback. Written to --to,
-           else <id>/index.html; nothing is fetched when it opens.
+           site's embed); an overview \u2014 key figures, the outline as a
+           timeline with the cited moments, the length of each part, the
+           speech rate over time; --summary rendered with every [V1 mm:ss] a
+           button that seeks the player; the chapters, the frames, and the
+           whole transcript, searchable and following playback. Written to
+           --to, else <id>/index.html; nothing is fetched when it opens.
   doctor   yt-dlp (and how old it is), ffmpeg, uvx, the whisper model, the
            transcript rungs, and where runs are kept.
 

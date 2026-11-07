@@ -7,6 +7,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { formatStamp, readVideoRun, type VideoSegment } from "./engine.js";
+import { OVERVIEW_CSS, OVERVIEW_SCRIPT, type OverviewLabels, overviewHtml } from "./overview.js";
+import { stampSeconds } from "./stamps.js";
+
+export { stampSeconds };
 
 interface Frame {
   file: string;
@@ -31,6 +35,24 @@ const LABELS = {
     whisper: "local whisper transcription",
     passage: "passage",
     passages: "passages",
+    overview: "Overview",
+    duration: "duration",
+    parts: "parts",
+    cited: "moments cited",
+    words: "words spoken",
+    rate: "speech rate",
+    perMin: "words/min",
+    outline: "Outline",
+    outlineNote: "each part of the video, and below it the moments the summary cites — click to jump there",
+    partLength: "Length of each part",
+    speech: "Speech rate",
+    speechNote: "words per minute across the video; the dashed line is the average, dips are pauses or inaudible passages",
+    table: "Show as a table",
+    part: "Part",
+    start: "Start",
+    length: "Length",
+    min: "min",
+    locale: "en-US",
   },
   fr: {
     summary: "Résumé",
@@ -48,17 +70,29 @@ const LABELS = {
     whisper: "transcription whisper locale",
     passage: "passage",
     passages: "passages",
+    overview: "Vue d'ensemble",
+    duration: "durée",
+    parts: "parties",
+    cited: "moments cités",
+    words: "mots prononcés",
+    rate: "débit",
+    perMin: "mots/min",
+    outline: "Déroulé",
+    outlineNote: "chaque partie de la vidéo, et dessous les moments cités par le résumé — cliquez pour y aller",
+    partLength: "Durée de chaque partie",
+    speech: "Débit de parole",
+    speechNote: "mots par minute au fil de la vidéo ; le pointillé est la moyenne, les creux sont des pauses ou des passages inaudibles",
+    table: "Voir en tableau",
+    part: "Partie",
+    start: "Début",
+    length: "Durée",
+    min: "min",
+    locale: "fr-FR",
   },
 };
-type Labels = (typeof LABELS)["en"];
+type Labels = (typeof LABELS)["en"] & OverviewLabels;
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
-/** `12:34` or `1:02:03` → seconds; undefined when it is not a stamp. */
-export function stampSeconds(stamp: string): number | undefined {
-  if (!/^\d{1,2}(?::\d{2}){1,2}$/.test(stamp)) return undefined;
-  return stamp.split(":").reduce((n, p) => n * 60 + Number(p), 0);
-}
 
 const seek = (t: number, label: string) => `<button type="button" class="stamp" data-t="${Math.floor(t)}">${esc(label)}</button>`;
 
@@ -217,6 +251,8 @@ export function runHtml(runDir: string, opts: HtmlOptions): { html: string } | {
   // The page's header already carries the title: a summary's leading `# Title` would repeat it.
   const summary = opts.summary ? markdownToHtml(opts.summary.replace(/^\s*#\s[^\n]*\n/, "")) : undefined;
 
+  const overview = overviewHtml({ duration: meta.duration ?? Math.max(0, ...segments.map((s) => s.end)), segments, chapters, summary: opts.summary }, L);
+
   const facts = [
     meta.channel,
     meta.uploadDate,
@@ -274,9 +310,9 @@ export function runHtml(runDir: string, opts: HtmlOptions): { html: string } | {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="ultrawatch">
 <title>${esc(meta.title)}</title>
-<style>${CSS}</style>
+<style>${CSS}${OVERVIEW_CSS}</style>
 </head>
-<body data-player="${p.kind}" data-page="${esc(meta.webpageUrl)}" data-passage="${L.passage}" data-passages="${L.passages}">
+<body data-duration="${meta.duration ?? ""}" data-player="${p.kind}" data-page="${esc(meta.webpageUrl)}" data-passage="${L.passage}" data-passages="${L.passages}">
 <header class="top">
   <h1>${esc(meta.title)}</h1>
   <p class="facts">${facts.map((x) => esc(String(x))).join(" · ")} · <a href="${esc(meta.webpageUrl)}" target="_blank" rel="noopener">${L.source}</a></p>
@@ -287,6 +323,7 @@ export function runHtml(runDir: string, opts: HtmlOptions): { html: string } | {
     <nav>${nav}</nav>
   </aside>
   <main>
+    ${overview}
     ${summary ? `<section class="summary"><h2 class="kicker">${L.summary}</h2>${summary.html}</section>` : ""}
     <section class="transcript">
       <div class="tbar"><h2 class="kicker">${L.transcript}</h2><input id="q" type="search" placeholder="${L.search}" aria-label="${L.searchAria}"><label><input id="follow" type="checkbox" checked> ${L.follow}</label><span id="count"></span></div>
@@ -295,6 +332,7 @@ export function runHtml(runDir: string, opts: HtmlOptions): { html: string } | {
   </main>
 </div>
 <script>${SCRIPT}</script>
+<script>${OVERVIEW_SCRIPT}</script>
 </body>
 </html>
 `;
@@ -314,7 +352,7 @@ function go(t) {
   mark(t, true);
 }
 document.addEventListener("click", (e) => {
-  const b = e.target.closest(".stamp");
+  const b = e.target.closest(".stamp, .stamp-like");
   if (b) { e.preventDefault(); go(Number(b.dataset.t)); }
 });
 let current;

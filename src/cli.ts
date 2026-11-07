@@ -86,10 +86,12 @@ COMMANDS
            line-by-line report otherwise; an answer with no claim fails too.
   html     One self-contained page to watch and understand a video: the
            player (the local file when the run was read from disk, else the
-           site's embed), --summary rendered with every [V1 mm:ss] a button
-           that seeks the player, the chapters, the frames, and the whole
-           transcript, searchable and following playback. Written to --to,
-           else <id>/index.html; nothing is fetched when it opens.
+           site's embed); an overview — key figures, the outline as a
+           timeline with the cited moments, the length of each part, the
+           speech rate over time; --summary rendered with every [V1 mm:ss] a
+           button that seeks the player; the chapters, the frames, and the
+           whole transcript, searchable and following playback. Written to
+           --to, else <id>/index.html; nothing is fetched when it opens.
   doctor   yt-dlp (and how old it is), ffmpeg, uvx, the whisper model, the
            transcript rungs, and where runs are kept.
 

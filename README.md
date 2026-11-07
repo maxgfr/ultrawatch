@@ -69,7 +69,7 @@ works from text that carries a stamp on every paragraph.
 | `ultrawatch frames <url\|id\|dir>` | The frames that matter, at most 20/50/100 (`--effort low\|med\|high`), aligned with the transcript. Needs ffmpeg. |
 | `ultrawatch list <playlist\|channel>` | The first `--limit` videos (default 10) read as a corpus, `CORPUS.md` naming them `V1`…`Vn`. |
 | `ultrawatch check <run> <answer.md>` | Every claim cited, every stamp on something said or shown. Exits 1 with a report otherwise. `--videos <id,id,…>` numbers videos fetched one by one. |
-| `ultrawatch html <url\|file\|id\|dir>` | One self-contained page to watch and understand the video: the player, `--summary` with every `[V1 mm:ss]` seeking it, the chapters, the frames, and the transcript, searchable and following playback (`--to` sets where). |
+| `ultrawatch html <url\|file\|id\|dir>` | One self-contained page to watch and understand the video: the player, an overview (key figures, the outline as a timeline, the length of each part, the speech rate), `--summary` with every `[V1 mm:ss]` seeking it, the chapters, the frames, and the transcript, searchable and following playback (`--to` sets where). |
 | `ultrawatch doctor` | yt-dlp and its age, ffmpeg, uvx, the whisper model, the rungs, the run directory. |
 
 `fetch`, `search`, `frames` and `list` take `--out <dir>` (the default is

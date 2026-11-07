@@ -87,10 +87,14 @@ ultrawatch doctor [--json]
   unknown `V#`, or stamp past the end or on nothing said or shown — and on an
   answer with no claim at all.
 - `html` — one self-contained page to watch and understand the video: the
-  player (the local file for a run read from disk, else the site's embed), the
-  `--summary` with every `[V1 mm:ss]` a button that seeks the player, the
+  player (the local file for a run read from disk, else the site's embed); an
+  overview with key figures, the outline as a clickable timeline with the
+  cited moments, the length of each part and the speech rate over time; the
+  `--summary` with every `[V1 mm:ss]` a button that seeks the player; the
   chapters, the frames (run `frames` first to have them), and the whole
-  transcript, searchable and following playback. Written to `--to`, else
+  transcript, searchable and following playback. The parts are the video's
+  chapters, else the summary's `##` sections that follow the video in order —
+  so write those sections in the video's order. Written to `--to`, else
   `<dir>/<id>/index.html`; labels follow the video's language (`--lang`).
 
 Exit codes: 0 done, 1 the answer is a failure (no transcript, nothing found, a
