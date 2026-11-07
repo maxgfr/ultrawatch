@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the [Conventional Commits](https://www.conventionalcommits.org/) by [semantic-release](https://github.com/semantic-release/semantic-release).
 
+## [1.4.1](https://github.com/maxgfr/ultrawatch/compare/v1.4.0...v1.4.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **html:** render quoted lists, drop [M] and the repeated title ([b56e423](https://github.com/maxgfr/ultrawatch/commit/b56e423ce63ef6f3c14d08d9046a652caad1ed26))
+
 # [1.4.0](https://github.com/maxgfr/ultrawatch/compare/v1.3.0...v1.4.0) (2026-11-07)
 
 
