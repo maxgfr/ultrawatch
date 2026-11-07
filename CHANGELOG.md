@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the [Conventional Commits](https://www.conventionalcommits.org/) by [semantic-release](https://github.com/semantic-release/semantic-release).
 
+## [1.5.1](https://github.com/maxgfr/ultrawatch/compare/v1.5.0...v1.5.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **html:** align part numbers and soften the cited-moment ticks ([896c6f4](https://github.com/maxgfr/ultrawatch/commit/896c6f492d3b45d3aa06a1481adc9b17ac2ff1ea))
+
 # [1.5.0](https://github.com/maxgfr/ultrawatch/compare/v1.4.1...v1.5.0) (2026-11-07)
 
 
