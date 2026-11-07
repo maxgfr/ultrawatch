@@ -89,7 +89,7 @@ ultrawatch doctor [--json]
   answer with no claim at all.
 - `html` — one self-contained page to watch and understand the video: the
   player (the local file, YouTube's embed, or both with a switch) with speeds
-  from 1× to 3× (YouTube stops at 2×); an overview with key figures, the
+  slider from 0.5× to 4× (YouTube stops at 2×); an overview with key figures, the
   outline as a clickable timeline with the cited moments, the length of each
   part and the speech rate over time; the `--summary` section by section,
   each section's "In short" shown and its points folded beneath, every
@@ -114,8 +114,9 @@ check failing), 2 the invocation was wrong.
 
 1. Lead with the answer, then the evidence; one idea per paragraph or bullet.
    In a long summary, open each `##` section with a cited `> **In short** —`
-   brief of two or three sentences, then its points
-   ([modes](references/modes.md)): bullets alone read as a heap.
+   brief that carries every point below it, condensed into prose, then its
+   points ([modes](references/modes.md)): bullets alone read as a heap, and
+   the page folds them, so a teaser brief loses what they say.
 2. Cite the segment's own stamp — the one `TRANSCRIPT.md` or `search` shows —
    not a stamp you estimate.
 3. Quote sparingly and exactly; mark auto-caption or whisper transcripts.

@@ -88,7 +88,7 @@ COMMANDS
            line-by-line report otherwise; an answer with no claim fails too.
   html     One self-contained page to watch and understand a video: the
            player — the local file when the run was read from disk, YouTube's
-           embed, or both with a switch — with speeds from 1× to 3× (YouTube
+           embed, or both with a switch — with a speed slider from 0.5× to 4× (YouTube
            stops at 2×); an overview — key figures, the outline as a timeline
            with the cited moments, the length of each part, the speech rate
            over time; --summary rendered section by section, each one's

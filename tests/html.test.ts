@@ -96,10 +96,10 @@ describe("the page", () => {
     expect(off.html).toContain("mark(e.detail, follow.checked)");
   });
 
-  it("offers the speeds, YouTube when the video is on it, and frames only on request", () => {
+  it("offers a speed slider up to 4×, YouTube when the video is on it, and frames only on request", () => {
     const r = runHtml(TED, { to: join(dir, "c.html") });
     if ("error" in r) throw new Error(r.error);
-    for (const rate of ["1", "1.25", "1.5", "2", "2.5", "3"]) expect(r.html).toContain(`data-rate="${rate}"`);
+    expect(r.html).toContain('<input type="range" id="rate" min="0.5" max="4" step="0.25" value="1">');
     expect(r.html).toContain('data-yt="iG9CE55wbtY"');
     expect(r.html).not.toContain('class="shots"');
     // A hidden source must not keep its box: [hidden] has to beat the player's display rules.

@@ -22,14 +22,17 @@ touches the site again.
    ```markdown
    ## The part's title
 
-   > **In short** — two or three sentences of prose: what this part is about
-   > and what is argued in it, by whom [V1 12:34; V1 15:02]
+   > **In short** — prose that carries every point below, condensed: the
+   > facts, names, figures and arguments, and who says what [V1 12:34; V1 15:02]
 
    - the detailed points, one per bullet, each cited [V1 12:34]
    ```
 
-   The brief is prose that links the points, not another list; it only says
-   what the points below say. `html` shows it and folds the points beneath it.
+   The brief is what most readers read: `html` shows it and folds the points
+   beneath it. So it is exhaustive, not a teaser — every point of the section
+   is in it, condensed and linked into prose (about half to two thirds of the
+   points' length; two or three paragraphs inside the quote when long), each
+   sentence cited. It only says what the points below say.
 4. For a long video (over ~40 minutes), read chapter by chapter and summarise
    each before the whole; cite the stamps inside, never only the chapter start.
 5. To let the user watch while reading, render it after `check` passes:

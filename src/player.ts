@@ -7,8 +7,9 @@
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-export const SPEEDS = [1, 1.25, 1.5, 2, 2.5, 3];
-/** YouTube's own ceiling: faster steps are only offered for the local file. */
+/** The speed slider's range and step; past 4× browsers mute the sound. */
+export const SPEED = { min: 0.5, max: 4, step: 0.25 };
+/** YouTube's own ceiling: faster speeds are only offered for the local file. */
 export const YOUTUBE_MAX_SPEED = 2;
 
 export interface PlayerLabels {
@@ -27,16 +28,12 @@ export function playerHtml(o: { file?: string; youtubeId?: string; pageUrl: stri
   const { file, youtubeId: yt } = o;
   if (!file && !yt) return { kind: "link", html: `<p><a id="player" href="${esc(o.pageUrl)}" target="_blank" rel="noopener">${esc(L.open)}</a></p>` };
   const kind = file ? "video" : "youtube";
-  const speed = (r: number) => `${String(r).replace(".", L.decimal)}×`;
   const sources =
     file && yt
       ? `<div class="seg-ctl" role="group" aria-label="${esc(L.sourceGroup)}"><button type="button" data-src="file" aria-pressed="true">${esc(L.local)}</button><button type="button" data-src="youtube" aria-pressed="false">${esc(L.youtube)}</button></div>`
       : "";
-  const speeds = `<div class="seg-ctl speed" role="group" aria-label="${esc(L.speed)}"><span>${esc(L.speed)}</span>${SPEEDS.map(
-    (r) =>
-      `<button type="button" data-rate="${r}" aria-pressed="${r === 1}"${r > YOUTUBE_MAX_SPEED ? ` data-title="${esc(L.ytMax)}"` : ""}>${speed(r)}</button>`,
-  ).join("")}</div>`;
-  const html = `<div class="uwp" data-kind="${kind}"${yt ? ` data-yt="${yt}"` : ""} data-page="${esc(o.pageUrl)}">
+  const speeds = `<div class="speed"><label for="rate">${esc(L.speed)}</label><input type="range" id="rate" min="${SPEED.min}" max="${SPEED.max}" step="${SPEED.step}" value="1"><output id="rate-v" for="rate">1×</output><button type="button" id="rate-reset" hidden>1×</button></div>`;
+  const html = `<div class="uwp" data-kind="${kind}"${yt ? ` data-yt="${yt}"` : ""} data-page="${esc(o.pageUrl)}" data-decimal="${esc(L.decimal)}" data-ytmax="${esc(L.ytMax)}">
 <div class="screen">${file ? `<video id="video" controls preload="metadata" src="${esc(file)}"></video>` : ""}${
     yt
       ? `<div class="frame" id="ytbox"${file ? " hidden" : ""}></div><p class="ytnote" hidden>${L.ytFromDisk} <a href="${esc(o.pageUrl)}" target="_blank" rel="noopener">${esc(L.onSite)}</a></p>`
@@ -63,6 +60,11 @@ export const PLAYER_CSS = `
 .seg-ctl button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
 .seg-ctl button:disabled{opacity:.4;cursor:not-allowed}
 .seg-ctl button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.speed{display:flex;align-items:center;gap:.5rem;font-size:.8rem;flex:1;min-width:13rem;max-width:20rem}
+.speed label{color:var(--muted)}
+.speed input{flex:1;accent-color:var(--accent);cursor:pointer;min-width:6rem}
+.speed output{font-variant-numeric:tabular-nums;font-weight:600;min-width:2.8em;text-align:right}
+#rate-reset{font:inherit;color:var(--accent);background:none;border:1px solid var(--line);border-radius:6px;padding:.1rem .4rem;cursor:pointer}
 `;
 
 export const PLAYER_SCRIPT = `(() => {
@@ -78,10 +80,11 @@ const ytBox = document.getElementById("ytbox");
 const note = box.querySelector(".ytnote");
 const yt = box.dataset.yt;
 const fromDisk = location.protocol === "file:";
-const rates = [...box.querySelectorAll("[data-rate]")];
+const slider = document.getElementById("rate"), shown = document.getElementById("rate-v"), reset = document.getElementById("rate-reset");
+const fmt = (r) => String(r).replace(".", box.dataset.decimal) + "×";
 const srcs = [...box.querySelectorAll("[data-src]")];
 let mode = video ? (yt && store.get("uw:src") === "youtube" ? "youtube" : "file") : "youtube";
-let rate = Number(store.get("uw:rate")) || 1;
+let rate = Math.min(${SPEED.max}, Math.max(${SPEED.min}, Number(store.get("uw:rate")) || 1));
 let iframe, ready = false, ytTime = 0, pending = null;
 const send = (func, args = []) => iframe && iframe.contentWindow && iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func, args, id: 1, channel: "widget" }), "*");
 function mount(start) {
@@ -109,15 +112,16 @@ window.addEventListener("message", (e) => {
 if (video) video.addEventListener("timeupdate", () => { if (mode === "file") emit(video.currentTime); });
 function paint() {
   srcs.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.src === mode)));
-  rates.forEach((b) => {
-    const r = Number(b.dataset.rate), off = mode === "youtube" && r > ${YOUTUBE_MAX_SPEED};
-    b.disabled = off; b.title = off ? b.dataset.title || "" : "";
-    b.setAttribute("aria-pressed", String(r === (mode === "youtube" ? Math.min(rate, ${YOUTUBE_MAX_SPEED}) : rate)));
-  });
+  // YouTube stops at 2×: the slider ends there while it plays, and the local speed comes back after.
+  const max = mode === "youtube" ? ${YOUTUBE_MAX_SPEED} : ${SPEED.max}, r = Math.min(rate, max);
+  slider.max = String(max); slider.value = String(r);
+  slider.title = mode === "youtube" ? box.dataset.ytmax : "";
+  slider.setAttribute("aria-valuetext", fmt(r));
+  shown.textContent = fmt(r); reset.hidden = r === 1;
 }
 function setRate(r) {
   rate = r; store.set("uw:rate", String(r));
-  if (video) video.playbackRate = r;
+  if (video && mode === "file") video.playbackRate = r;
   if (ready) send("setPlaybackRate", [Math.min(r, ${YOUTUBE_MAX_SPEED})]);
   paint();
 }
@@ -126,7 +130,7 @@ function setMode(m) {
   const t = time();
   mode = m; store.set("uw:src", m);
   if (m === "youtube") { if (video) { video.pause(); video.hidden = true; } pending = t; mount(t); if (ready) { send("seekTo", [t, true]); pending = null; } }
-  else { send("pauseVideo"); ytBox.hidden = true; note.hidden = true; video.hidden = false; video.currentTime = t; }
+  else { send("pauseVideo"); ytBox.hidden = true; note.hidden = true; video.hidden = false; video.currentTime = t; video.playbackRate = rate; }
   paint();
 }
 function time() { return mode === "youtube" ? ytTime : video ? video.currentTime : 0; }
@@ -137,11 +141,12 @@ function seek(t) {
   else { pending = t; mount(t); }
   emit(t);
 }
+slider.addEventListener("input", () => setRate(Number(slider.value)));
+reset.addEventListener("click", () => setRate(1));
 box.addEventListener("click", (e) => {
-  const r = e.target.closest("[data-rate]"); if (r && !r.disabled) setRate(Number(r.dataset.rate));
   const s = e.target.closest("[data-src]"); if (s) setMode(s.dataset.src);
 });
-if (video) { video.playbackRate = rate; video.addEventListener("ratechange", () => { if (video.playbackRate !== rate) { rate = video.playbackRate; store.set("uw:rate", String(rate)); paint(); } }); }
+if (video) { video.playbackRate = rate; video.addEventListener("ratechange", () => { if (mode === "file" && video.playbackRate !== rate) { rate = video.playbackRate; store.set("uw:rate", String(rate)); paint(); } }); }
 if (mode === "youtube") { if (video) video.hidden = true; mount(0); }
 paint();
 window.uwPlayer = { seek, time };
