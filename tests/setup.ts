@@ -1,7 +1,7 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { beforeEach } from "vitest";
+import { afterAll, beforeEach } from "vitest";
 
 // Every run and cache the suite touches lives in a throwaway directory: a test
 // must never read, or overwrite, a video a user already fetched.
@@ -10,3 +10,4 @@ beforeEach(() => {
   process.env.ULTRAWATCH_VIDEO_DIR = join(scratch, "video");
   process.env.ULTRAWATCH_CACHE_DIR = join(scratch, "cache");
 });
+afterAll(() => rmSync(scratch, { recursive: true, force: true }));
