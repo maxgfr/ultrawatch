@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { existsSync as existsSync8, readFileSync as readFileSync9, realpathSync as realpathSync2 } from "fs";
-import { join as join12, resolve as resolve4 } from "path";
-import { pathToFileURL } from "url";
+import { existsSync as existsSync9, readFileSync as readFileSync10, realpathSync as realpathSync2 } from "fs";
+import { join as join13, resolve as resolve5 } from "path";
+import { pathToFileURL as pathToFileURL2 } from "url";
 
 // src/check.ts
 import { existsSync, readFileSync as readFileSync2 } from "fs";
@@ -8445,6 +8445,193 @@ function judge(tok, videos, line) {
   return [{ line, kind: "no-segment", message: `[${tok}] \u2014 nothing is said or shown in ${label} around ${stamp[2]} (\xB1${SLACK_S} s)` }];
 }
 
+// src/local.ts
+import { createHash as createHash2 } from "crypto";
+import { existsSync as existsSync8, mkdtempSync, readdirSync as readdirSync6, readFileSync as readFileSync9, rmSync, statSync as statSync6, symlinkSync } from "fs";
+import { tmpdir as tmpdir2 } from "os";
+import { basename as basename3, dirname, extname, join as join12, resolve as resolve4 } from "path";
+import { pathToFileURL } from "url";
+function isLocalVideo(target) {
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target)) return false;
+  try {
+    return statSync6(target).isFile();
+  } catch {
+    return false;
+  }
+}
+function localIdentity(path) {
+  const stem = basename3(path, extname(path));
+  const m = /^(.*?)\s*\[([A-Za-z0-9_-]{11})\]$/.exec(stem);
+  if (m) return { key: m[2], title: m[1].trim() || m[2], youtubeId: m[2] };
+  const slug = stem.normalize("NFKD").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase().slice(0, 80) || "video";
+  const hash = createHash2("sha256").update(resolve4(path)).digest("hex").slice(0, 8);
+  return { key: `local-${slug}-${hash}`, title: stem };
+}
+async function ffprobe(path, run2) {
+  const r = await run2("ffprobe", ["-v", "error", "-print_format", "json", "-show_format", "-show_chapters", "--", path], { timeoutMs: 6e4 });
+  if (r.missing) return { error: "a local file needs ffmpeg (ffprobe)" };
+  if (!r.ok) return { error: `ffprobe cannot read ${path}: ${r.stderr.trim().split("\n").pop() ?? ""}` };
+  try {
+    const j = JSON.parse(r.stdout);
+    const duration = Number(j.format?.duration);
+    const chapters = (j.chapters ?? []).map((c, i) => ({ start: Number(c.start_time) || 0, end: Number(c.end_time) || 0, title: c.tags?.title?.trim() || `Chapter ${i + 1}` })).filter((c) => Number.isFinite(c.start));
+    const tags = j.format?.tags ?? {};
+    return { duration: Number.isFinite(duration) ? duration : void 0, chapters, title: tags.title ?? tags.TITLE };
+  } catch {
+    return { error: "ffprobe returned unreadable metadata" };
+  }
+}
+function sidecarVtt(path, lang) {
+  const stem = basename3(path, extname(path));
+  let names;
+  try {
+    names = readdirSync6(dirname(path));
+  } catch {
+    return void 0;
+  }
+  const subs = names.filter((n) => n.startsWith(`${stem}.`) && n.endsWith(".vtt"));
+  const want = lang?.toLowerCase().split(/[-_]/)[0];
+  const pick2 = want && subs.find(
+    (n) => n.slice(stem.length + 1, -4).toLowerCase().split(/[-_]/)[0] === want
+  ) || (want ? void 0 : subs[0]);
+  return pick2 ? join12(dirname(path), pick2) : void 0;
+}
+function whisperSegments2(json2) {
+  try {
+    const parsed = JSON.parse(json2);
+    return (parsed.segments ?? []).map((s) => ({
+      start: Number(s.start),
+      end: Number(s.end),
+      text: String(s.text ?? "").replace(/\s+/g, " ").trim()
+    })).filter((s) => Number.isFinite(s.start) && Number.isFinite(s.end) && s.text);
+  } catch {
+    return [];
+  }
+}
+async function whisperLocal(path, duration, lang, run2) {
+  const fromEnv = Number(process.env[envName("WHISPER_TIMEOUT_MS")]);
+  const budget = Number.isFinite(fromEnv) && fromEnv >= 1e3 ? fromEnv : Math.max(30 * 6e4, (duration ?? 0) * 1e3);
+  const deadline = Date.now() + budget;
+  const left = () => Math.max(1e3, deadline - Date.now());
+  const dir = mkdtempSync(join12(tmpdir2(), "ultrawatch-local-"));
+  try {
+    const wav = join12(dir, "speech.wav");
+    const ff = await run2("ffmpeg", ["-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", path, "-vn", "-ar", "16000", "-ac", "1", wav], {
+      timeoutMs: left()
+    });
+    if (ff.missing) return { failed: "whisper needs ffmpeg" };
+    if (!ff.ok || !existsSync8(wav)) return { failed: `ffmpeg could not extract the audio: ${ff.stderr.trim().split("\n").pop() ?? ""}` };
+    const args = [
+      "--with",
+      "av<18",
+      "whisper-ctranslate2",
+      wav,
+      "--model",
+      whisperModel(),
+      "--output_format",
+      "json",
+      "--output_dir",
+      dir,
+      "--batched",
+      "True"
+    ];
+    const base2 = lang?.toLowerCase().split(/[-_]/)[0];
+    if (base2 && /^[a-z]{2,3}$/.test(base2)) args.push("--language", base2);
+    const w = await run2("uvx", args, { timeoutMs: left(), cwd: dir });
+    if (w.missing) return { failed: "whisper needs uvx (https://docs.astral.sh/uv/)" };
+    if (w.status === 124) return { failed: `whisper timed out after ${Math.round(budget / 6e4)} min (${envName("WHISPER_TIMEOUT_MS")})` };
+    const out = join12(dir, "speech.json");
+    if (!w.ok || !existsSync8(out)) return { failed: `whisper: ${w.stderr.trim().split("\n").pop() || "failed"}` };
+    return { segments: whisperSegments2(readFileSync9(out, "utf8")) };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+async function fetchLocalRun(file, root, opts = {}) {
+  const path = resolve4(file);
+  const run2 = opts.run ?? shAsync;
+  const { key, title, youtubeId } = localIdentity(path);
+  const dir = join12(root, key);
+  const transcriptPath = join12(dir, "TRANSCRIPT.md");
+  if (!opts.refresh) {
+    const kept = readVideoRun(dir);
+    if (kept && existsSync8(transcriptPath) && (!opts.lang || kept.meta.lang === opts.lang))
+      return { ok: true, id: key, dir, transcript: transcriptPath, reused: true, meta: kept.meta, segments: kept.segments.length };
+  }
+  const probed = await ffprobe(path, run2);
+  if ("error" in probed) return { ok: false, id: key, reason: probed.error };
+  const meta = {
+    id: youtubeId ?? key,
+    site: youtubeId ? "youtube" : "local",
+    key,
+    title: probed.title ?? title,
+    duration: probed.duration,
+    ...opts.lang ? { language: opts.lang } : {},
+    chapters: probed.chapters,
+    subtitles: [],
+    autoCaptions: [],
+    webpageUrl: youtubeId ? `https://www.youtube.com/watch?v=${youtubeId}` : pathToFileURL(path).href
+  };
+  const starts = meta.chapters.map((c) => c.start);
+  let segments;
+  let via;
+  let track2;
+  const vtt = sidecarVtt(path, opts.lang);
+  if (vtt) {
+    segments = mergeSegments(parseVtt(readFileSync9(vtt, "utf8")), starts);
+    via = "manual-subs";
+    track2 = basename3(vtt).slice(basename3(path, extname(path)).length + 1, -4);
+  } else {
+    const w = await whisperLocal(path, meta.duration, opts.lang, run2);
+    if ("failed" in w) return { ok: false, id: key, reason: w.failed ?? "whisper failed" };
+    segments = mergeSegments(w.segments, starts);
+    via = "whisper";
+  }
+  const verdict = assessTranscript(segments, meta.duration);
+  if (!verdict.ok) return { ok: false, id: key, reason: verdict.reason ?? "no transcript" };
+  const t = { text: segments.map((s) => s.text).join("\n"), segments, chapters: meta.chapters, meta, via, ...track2 ? { track: track2 } : {} };
+  const runMeta = {
+    ...meta,
+    via,
+    ...track2 ? { track: track2 } : {},
+    ...opts.lang ? { lang: opts.lang } : {},
+    file: path,
+    fetchedAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  const markdown = transcriptMarkdown(t);
+  const done = { ok: true, id: key, dir, transcript: transcriptPath, reused: false, meta: runMeta, segments: segments.length };
+  if (isNoWrite()) return { ...done, markdown };
+  try {
+    ensureDir(dir);
+    writeArtifact(join12(dir, "segments.json"), `${JSON.stringify(segments, null, 1)}
+`);
+    writeArtifact(transcriptPath, markdown);
+    writeArtifact(join12(dir, "meta.json"), `${JSON.stringify(runMeta, null, 2)}
+`);
+  } catch (e) {
+    return { ok: false, id: key, reason: `cannot write the run in ${dir}: ${e.message}` };
+  }
+  return done;
+}
+function localFileOf(runDir) {
+  const file = readVideoRun(runDir)?.meta?.file;
+  return typeof file === "string" && isLocalVideo(file) ? file : void 0;
+}
+async function extractLocalFrames(runDir, file, opts = {}) {
+  const path = resolve4(file);
+  const base2 = opts.run ?? shAsync;
+  const run2 = async (cmd, args, o) => {
+    if (cmd !== "yt-dlp") return base2(cmd, args, o);
+    const template = args[args.indexOf("-o") + 1];
+    if (!args.includes("-o") || !template) return { ok: false, status: 1, stdout: "", stderr: "a local file is only ever downloaded" };
+    symlinkSync(path, template.replace("%(ext)s", extname(path).slice(1) || "mp4"));
+    return { ok: true, status: 0, stdout: "", stderr: "" };
+  };
+  const meta = readVideoRun(runDir)?.meta;
+  const url = meta && /^https?:\/\//i.test(meta.webpageUrl) ? meta.webpageUrl : "https://localhost/";
+  return extractFrames(runDir, { effort: opts.effort, url, deps: { run: run2, have: opts.have ?? have } });
+}
+
 // src/version.ts
 var VERSION = "1.2.5";
 
@@ -8456,9 +8643,9 @@ timestamped transcripts and on-screen frames, kept on disk, searchable, and
 checked \u2014 every claim cites a [V# mm:ss] stamp that exists. Local and keyless.
 
 USAGE
-  ultrawatch fetch <url> [--out <dir>] [--lang <tag>] [--refresh] [--json]
+  ultrawatch fetch <url|file> [--out <dir>] [--lang <tag>] [--refresh] [--json]
   ultrawatch search <query> [--out <dir>] [--limit <n>] [--videos <id,id,\u2026>] [--json]
-  ultrawatch frames <url|id|dir> [--effort low|med|high] [--out <dir>] [--lang <tag>] [--json]
+  ultrawatch frames <url|file|id|dir> [--effort low|med|high] [--out <dir>] [--lang <tag>] [--json]
   ultrawatch list <playlist|channel> [--limit <n>] [--out <dir>] [--lang <tag>] [--refresh] [--json]
   ultrawatch check <run> <answer.md> [--videos <id,id,\u2026>] [--json]
   ultrawatch doctor [--json]
@@ -8471,6 +8658,9 @@ COMMANDS
            (never a machine translation), else a local whisper transcription.
            A video already on disk is reused without touching the site;
            --refresh reads it again, --lang picks the subtitle language.
+           A video file already on disk is read in place: a sidecar
+           <name>.<lang>.vtt, else local whisper (--lang sets its language);
+           a yt-dlp name ending in [<id>] keys the run by that YouTube id.
   search   Rank ~45 s passages of every video under the directory \u2014 or of a
            corpus, labelled V1\u2026Vn \u2014 against a question: each with its stamp,
            chapter and a link that opens the video there. For follow-up
@@ -8480,7 +8670,8 @@ COMMANDS
   frames   What is on screen: a frame at every scene change and chapter start,
            near-duplicates dropped, at most 20/50/100 by --effort (med), in
            <id>/frames/, with FRAMES.md pairing each with what was said from
-           5 s before to 10 s after. Needs ffmpeg.
+           5 s before to 10 s after. Needs ffmpeg. A run read from a local
+           file takes its frames from that file, with no download.
   list     Read the first --limit videos (default 10) of a playlist or channel,
            two at a time, and write CORPUS.md naming them V1\u2026Vn.
   check    Check an answer against its run: every claim of six words or more
@@ -8525,7 +8716,7 @@ function videoList(args) {
 }
 function citeLabels(root, videos) {
   if (videos) return new Map(videos.map((id, i) => [id, `V${i + 1}`]));
-  if (existsSync8(join12(root, "corpus.json"))) return void 0;
+  if (existsSync9(join13(root, "corpus.json"))) return void 0;
   const runs = listVideoRuns(root);
   return runs.length === 1 ? /* @__PURE__ */ new Map([[runs[0].meta.id, "V1"]]) : void 0;
 }
@@ -8545,14 +8736,15 @@ async function run(args) {
   const asJson = argBool(args, "json");
   if (cmd === "fetch") {
     const url = args.positional[0];
-    if (!url) usage("usage: ultrawatch fetch <url> [--out <dir>] [--lang <tag>] [--refresh] [--json]");
-    const r = await fetchVideoRun(url, root, { refresh: argBool(args, "refresh"), lang: argValue(args, "lang") });
+    if (!url) usage("usage: ultrawatch fetch <url|file> [--out <dir>] [--lang <tag>] [--refresh] [--json]");
+    const fetchOpts = { refresh: argBool(args, "refresh"), lang: argValue(args, "lang") };
+    const r = isLocalVideo(url) ? await fetchLocalRun(url, root, fetchOpts) : await fetchVideoRun(url, root, fetchOpts);
     if (!r.ok) {
       if (asJson) process.stdout.write(jsonLine(r));
       fail(`no transcript for ${url}: ${r.reason}`);
     }
     if (asJson) process.stdout.write(jsonLine({ ...r, title: r.meta.title, via: r.meta.via, duration: r.meta.duration }));
-    else if (isNoWrite()) process.stdout.write(r.markdown ?? readFileSync9(r.transcript, "utf8"));
+    else if (isNoWrite()) process.stdout.write(r.markdown ?? readFileSync10(r.transcript, "utf8"));
     else {
       const m = r.meta;
       const facts = [m.channel, m.duration !== void 0 ? formatStamp(m.duration) : void 0, m.via, plural2(r.segments, "segment")].filter(Boolean).join(" \xB7 ");
@@ -8577,16 +8769,21 @@ async function run(args) {
   }
   if (cmd === "frames") {
     const target = args.positional[0];
-    if (!target) usage("usage: ultrawatch frames <url|id|dir> [--effort low|med|high] [--out <dir>] [--json]");
+    if (!target) usage("usage: ultrawatch frames <url|file|id|dir> [--effort low|med|high] [--out <dir>] [--json]");
     const effort = argValue(args, "effort") ?? "med";
     if (!(effort in FRAME_EFFORT)) usage(`--effort must be low, med or high, not "${effort}"`);
     let runDir;
-    if (/^https?:\/\//i.test(target)) {
+    if (isLocalVideo(target)) {
+      const r2 = await fetchLocalRun(target, root, { lang: argValue(args, "lang") });
+      if (!r2.ok) fail(`no transcript for ${target}: ${r2.reason}`);
+      runDir = r2.dir;
+    } else if (/^https?:\/\//i.test(target)) {
       const r2 = await fetchVideoRun(target, root, { lang: argValue(args, "lang") });
       if (!r2.ok) fail(`no transcript for ${target}: ${r2.reason}`);
       runDir = r2.dir;
-    } else runDir = existsSync8(join12(root, target, "meta.json")) ? join12(root, target) : resolve4(target);
-    const r = await extractFrames(runDir, { effort });
+    } else runDir = existsSync9(join13(root, target, "meta.json")) ? join13(root, target) : resolve5(target);
+    const localFile = localFileOf(runDir);
+    const r = localFile ? await extractLocalFrames(runDir, localFile, { effort }) : await extractFrames(runDir, { effort });
     if (!r.ok) {
       if (asJson) process.stdout.write(jsonLine(r));
       fail(r.reason);
@@ -8630,11 +8827,11 @@ ${r.videos.map((v) => `  ${v.label.padEnd(4)}${v.dir ? `${(v.via ?? "").padEnd(1
     const videos = videoList(args);
     let answer;
     try {
-      answer = readFileSync9(file, "utf8");
+      answer = readFileSync10(file, "utf8");
     } catch {
       return fail(`cannot read ${file}`);
     }
-    const r = checkAnswer(resolve4(dir), answer, { videos });
+    const r = checkAnswer(resolve5(dir), answer, { videos });
     if ("error" in r) fail(r.error);
     const failing = r.problems.filter((p) => !NOTE_KINDS.has(p.kind));
     if (asJson) process.stdout.write(jsonLine({ ok: failing.length === 0, ...r }));
@@ -8717,7 +8914,7 @@ async function main(argv) {
 }
 function isStartedFile() {
   try {
-    return !!process.argv[1] && pathToFileURL(realpathSync2(process.argv[1])).href === import.meta.url;
+    return !!process.argv[1] && pathToFileURL2(realpathSync2(process.argv[1])).href === import.meta.url;
   } catch {
     return false;
   }

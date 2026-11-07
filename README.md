@@ -64,7 +64,7 @@ works from text that carries a stamp on every paragraph.
 
 | Command | What it does |
 |---|---|
-| `ultrawatch fetch <url>` | One video into `<dir>/<id>/`, reused on the next call (`--refresh` reads it again, `--lang` picks the subtitle language). |
+| `ultrawatch fetch <url\|file>` | One video into `<dir>/<id>/`, reused on the next call (`--refresh` reads it again, `--lang` picks the subtitle language). A file already on disk is read in place: a sidecar `.vtt`, else local whisper. |
 | `ultrawatch search <query>` | The ~45 s passages that answer, each with its stamp, chapter and a link that opens the video there, labelled as you cite them (`--limit`, `--videos`). |
 | `ultrawatch frames <url\|id\|dir>` | The frames that matter, at most 20/50/100 (`--effort low\|med\|high`), aligned with the transcript. Needs ffmpeg. |
 | `ultrawatch list <playlist\|channel>` | The first `--limit` videos (default 10) read as a corpus, `CORPUS.md` naming them `V1`…`Vn`. |

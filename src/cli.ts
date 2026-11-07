@@ -34,6 +34,7 @@ import {
   type VideoRunner,
   ytdlpVersionAge,
 } from "./engine.js";
+import { extractLocalFrames, fetchLocalRun, isLocalVideo, localFileOf } from "./local.js";
 import { VERSION } from "./version.js";
 
 export const HELP = `ultrawatch v${VERSION} (webindex ${ENGINE_VERSION})
@@ -43,9 +44,9 @@ timestamped transcripts and on-screen frames, kept on disk, searchable, and
 checked — every claim cites a [V# mm:ss] stamp that exists. Local and keyless.
 
 USAGE
-  ultrawatch fetch <url> [--out <dir>] [--lang <tag>] [--refresh] [--json]
+  ultrawatch fetch <url|file> [--out <dir>] [--lang <tag>] [--refresh] [--json]
   ultrawatch search <query> [--out <dir>] [--limit <n>] [--videos <id,id,…>] [--json]
-  ultrawatch frames <url|id|dir> [--effort low|med|high] [--out <dir>] [--lang <tag>] [--json]
+  ultrawatch frames <url|file|id|dir> [--effort low|med|high] [--out <dir>] [--lang <tag>] [--json]
   ultrawatch list <playlist|channel> [--limit <n>] [--out <dir>] [--lang <tag>] [--refresh] [--json]
   ultrawatch check <run> <answer.md> [--videos <id,id,…>] [--json]
   ultrawatch doctor [--json]
@@ -58,6 +59,9 @@ COMMANDS
            (never a machine translation), else a local whisper transcription.
            A video already on disk is reused without touching the site;
            --refresh reads it again, --lang picks the subtitle language.
+           A video file already on disk is read in place: a sidecar
+           <name>.<lang>.vtt, else local whisper (--lang sets its language);
+           a yt-dlp name ending in [<id>] keys the run by that YouTube id.
   search   Rank ~45 s passages of every video under the directory — or of a
            corpus, labelled V1…Vn — against a question: each with its stamp,
            chapter and a link that opens the video there. For follow-up
@@ -67,7 +71,8 @@ COMMANDS
   frames   What is on screen: a frame at every scene change and chapter start,
            near-duplicates dropped, at most 20/50/100 by --effort (med), in
            <id>/frames/, with FRAMES.md pairing each with what was said from
-           5 s before to 10 s after. Needs ffmpeg.
+           5 s before to 10 s after. Needs ffmpeg. A run read from a local
+           file takes its frames from that file, with no download.
   list     Read the first --limit videos (default 10) of a playlist or channel,
            two at a time, and write CORPUS.md naming them V1…Vn.
   check    Check an answer against its run: every claim of six words or more
@@ -149,8 +154,9 @@ async function run(args: CommandArgs): Promise<void> {
 
   if (cmd === "fetch") {
     const url = args.positional[0];
-    if (!url) usage("usage: ultrawatch fetch <url> [--out <dir>] [--lang <tag>] [--refresh] [--json]");
-    const r = await fetchVideoRun(url, root, { refresh: argBool(args, "refresh"), lang: argValue(args, "lang") });
+    if (!url) usage("usage: ultrawatch fetch <url|file> [--out <dir>] [--lang <tag>] [--refresh] [--json]");
+    const fetchOpts = { refresh: argBool(args, "refresh"), lang: argValue(args, "lang") };
+    const r = isLocalVideo(url) ? await fetchLocalRun(url, root, fetchOpts) : await fetchVideoRun(url, root, fetchOpts);
     if (!r.ok) {
       if (asJson) process.stdout.write(jsonLine(r));
       fail(`no transcript for ${url}: ${r.reason}`);
@@ -180,16 +186,24 @@ async function run(args: CommandArgs): Promise<void> {
 
   if (cmd === "frames") {
     const target = args.positional[0];
-    if (!target) usage("usage: ultrawatch frames <url|id|dir> [--effort low|med|high] [--out <dir>] [--json]");
+    if (!target) usage("usage: ultrawatch frames <url|file|id|dir> [--effort low|med|high] [--out <dir>] [--json]");
     const effort = argValue(args, "effort") ?? "med";
     if (!(effort in FRAME_EFFORT)) usage(`--effort must be low, med or high, not "${effort}"`);
     let runDir: string;
-    if (/^https?:\/\//i.test(target)) {
+    if (isLocalVideo(target)) {
+      const r = await fetchLocalRun(target, root, { lang: argValue(args, "lang") });
+      if (!r.ok) fail(`no transcript for ${target}: ${r.reason}`);
+      runDir = r.dir;
+    } else if (/^https?:\/\//i.test(target)) {
       const r = await fetchVideoRun(target, root, { lang: argValue(args, "lang") });
       if (!r.ok) fail(`no transcript for ${target}: ${r.reason}`);
       runDir = r.dir;
     } else runDir = existsSync(join(root, target, "meta.json")) ? join(root, target) : resolve(target);
-    const r = await extractFrames(runDir, { effort: effort as FrameEffort });
+    // A run read from disk takes its frames from the same file, not from the site.
+    const localFile = localFileOf(runDir);
+    const r = localFile
+      ? await extractLocalFrames(runDir, localFile, { effort: effort as FrameEffort })
+      : await extractFrames(runDir, { effort: effort as FrameEffort });
     if (!r.ok) {
       if (asJson) process.stdout.write(jsonLine(r));
       fail(r.reason);

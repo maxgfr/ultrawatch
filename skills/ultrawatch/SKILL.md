@@ -58,7 +58,7 @@ fetch, search, frames and check all see the same runs. Without it, runs land in
 ## Commands
 
 ```bash
-ultrawatch fetch <url> [--out <dir>] [--lang <tag>] [--refresh] [--json]
+ultrawatch fetch <url|file> [--out <dir>] [--lang <tag>] [--refresh] [--json]
 ultrawatch search <query> [--out <dir>] [--limit <n>] [--videos <id,id,…>] [--json]
 ultrawatch frames <url|id|dir> [--effort low|med|high] [--out <dir>] [--lang <tag>] [--json]
 ultrawatch list <playlist|channel> [--limit <n>] [--out <dir>] [--lang <tag>] [--refresh] [--json]
@@ -69,6 +69,9 @@ ultrawatch doctor [--json]
 - `fetch` — one video into `<dir>/<id>/`: `TRANSCRIPT.md` (header, `##` per
   chapter, `[mm:ss]` per paragraph), `segments.json`, `meta.json`. Manual
   subtitles → the video's own auto-captions → local whisper (minutes).
+  A video file already on disk is read in place, with no download: a
+  sidecar `<name>.<lang>.vtt`, else local whisper (`--lang` sets its
+  language); a yt-dlp name ending in `[<id>]` keys the run by that YouTube id.
 - `search` — ~45 s passages ranked against the question, each with its stamp,
   chapter and a link that opens the video there, labelled the way you cite it
   (`[V1 02:16]`: V1 for one video, V1…Vn in a corpus or by `--videos`).
