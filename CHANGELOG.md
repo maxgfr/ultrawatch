@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the [Conventional Commits](https://www.conventionalcommits.org/) by [semantic-release](https://github.com/semantic-release/semantic-release).
 
+# [1.7.0](https://github.com/maxgfr/ultrawatch/compare/v1.6.0...v1.7.0) (2026-11-07)
+
+
+### Features
+
+* **html:** a speed slider up to 4×, and exhaustive section briefs ([5d66077](https://github.com/maxgfr/ultrawatch/commit/5d66077bcb248ad7cf369d6ac77a4b95f57a92b9))
+
 # [1.6.0](https://github.com/maxgfr/ultrawatch/compare/v1.5.2...v1.6.0) (2026-11-07)
 
 
