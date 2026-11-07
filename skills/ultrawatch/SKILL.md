@@ -53,6 +53,7 @@ fetch, search, frames and check all see the same runs. Without it, runs land in
 | a follow-up about a video already fetched | `search` only — no new fetch | [modes](references/modes.md) |
 | what is shown: slides, code, diagrams, a demo | `frames <url> --effort low`, read the images FRAMES.md lists | [frames](references/frames.md) |
 | several videos: a playlist, a channel, a comparison | `list <url> --limit n`, then `search`, cite `V1`…`Vn` | [multi-video](references/multi-video.md) |
+| to see the video and understand it: a page, HTML, "something to watch" | the answer as usual, `check`, then `html <id> --summary <answer.md>` | below |
 | to know why a video could not be read | the note, then `doctor` | [engine-evidence](references/engine-evidence.md) |
 
 ## Commands
@@ -63,6 +64,7 @@ ultrawatch search <query> [--out <dir>] [--limit <n>] [--videos <id,id,…>] [--
 ultrawatch frames <url|id|dir> [--effort low|med|high] [--out <dir>] [--lang <tag>] [--json]
 ultrawatch list <playlist|channel> [--limit <n>] [--out <dir>] [--lang <tag>] [--refresh] [--json]
 ultrawatch check <run> <answer.md> [--videos <id,id,…>] [--json]
+ultrawatch html <url|file|id|dir> [--summary <answer.md>] [--to <page.html>] [--out <dir>] [--json]
 ultrawatch doctor [--json]
 ```
 
@@ -84,6 +86,12 @@ ultrawatch doctor [--json]
   naming V1, V2…; exits 1 with a line-by-line report on any uncited claim,
   unknown `V#`, or stamp past the end or on nothing said or shown — and on an
   answer with no claim at all.
+- `html` — one self-contained page to watch and understand the video: the
+  player (the local file for a run read from disk, else the site's embed), the
+  `--summary` with every `[V1 mm:ss]` a button that seeks the player, the
+  chapters, the frames (run `frames` first to have them), and the whole
+  transcript, searchable and following playback. Written to `--to`, else
+  `<dir>/<id>/index.html`; labels follow the video's language (`--lang`).
 
 Exit codes: 0 done, 1 the answer is a failure (no transcript, nothing found, a
 check failing), 2 the invocation was wrong.
@@ -98,7 +106,11 @@ check failing), 2 the invocation was wrong.
    `ultrawatch check <run> <dir>/answer.md`, fix, repeat until it passes.
 5. End with the video's link, and the links a claim most depends on
    (`search` gives `…&t=Ns`).
-6. Give the user every file by its absolute path: the answer, and each video's
+6. When the user wants to see or study the video, or asks for HTML: after
+   `check` passes, `ultrawatch html <id> --out <dir> --summary <dir>/answer.md
+   --to <page.html>` — one page per video, the summary's stamps seeking the
+   player. Run `frames <id> --effort low` before it when the visuals matter.
+7. Give the user every file by its absolute path: the answer, and each video's
    full transcript (`<dir>/<id>/TRANSCRIPT.md`) for reading beyond the answer.
    Say when `<dir>` sits under a temporary directory, and offer to copy them
    somewhere lasting.

@@ -17,6 +17,9 @@ touches the site again.
    made). Open with one sentence on what the video is and who made it `[M]`.
 4. For a long video (over ~40 minutes), read chapter by chapter and summarise
    each before the whole; cite the stamps inside, never only the chapter start.
+5. To let the user watch while reading, render it after `check` passes:
+   `ultrawatch html <id> --out <dir> --summary <dir>/answer.md` — every stamp of
+   the summary seeks the player, beside the full, searchable transcript.
 
 ## Question
 

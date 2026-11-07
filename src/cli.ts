@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { checkAnswer, NOTE_KINDS } from "./check.js";
@@ -34,6 +34,7 @@ import {
   type VideoRunner,
   ytdlpVersionAge,
 } from "./engine.js";
+import { runHtml } from "./html.js";
 import { extractLocalFrames, fetchLocalRun, isLocalVideo, localFileOf } from "./local.js";
 import { VERSION } from "./version.js";
 
@@ -49,6 +50,7 @@ USAGE
   ultrawatch frames <url|file|id|dir> [--effort low|med|high] [--out <dir>] [--lang <tag>] [--json]
   ultrawatch list <playlist|channel> [--limit <n>] [--out <dir>] [--lang <tag>] [--refresh] [--json]
   ultrawatch check <run> <answer.md> [--videos <id,id,…>] [--json]
+  ultrawatch html <url|file|id|dir> [--summary <answer.md>] [--to <page.html>] [--out <dir>] [--json]
   ultrawatch doctor [--json]
   ultrawatch version
 
@@ -82,6 +84,12 @@ COMMANDS
            video's directory, a corpus, or a directory of videos fetched one
            by one with --videos naming V1, V2… in order. Exits 1 with a
            line-by-line report otherwise; an answer with no claim fails too.
+  html     One self-contained page to watch and understand a video: the
+           player (the local file when the run was read from disk, else the
+           site's embed), --summary rendered with every [V1 mm:ss] a button
+           that seeks the player, the chapters, the frames, and the whole
+           transcript, searchable and following playback. Written to --to,
+           else <id>/index.html; nothing is fetched when it opens.
   doctor   yt-dlp (and how old it is), ffmpeg, uvx, the whisper model, the
            transcript rungs, and where runs are kept.
 
@@ -93,14 +101,14 @@ ENVIRONMENT
   ULTRAWATCH_WHISPER_MODEL, ULTRAWATCH_WHISPER_MAX, ULTRAWATCH_WHISPER_TIMEOUT_MS
                             whisper's model (small), videos per process (3), one video's budget (1800000)
   ULTRAWATCH_YTDLP_ARGS     extra yt-dlp flags on every call: browser cookies, a proxy
-  ULTRAWATCH_NO_WRITE       write nothing: fetch prints the transcript, frames and list refuse
+  ULTRAWATCH_NO_WRITE       write nothing: fetch and html print, frames and list refuse
 
 Nothing here needs an API key. yt-dlp is required; ffmpeg and uv (uvx) unlock
 frames and whisper.`;
 
-export const VALUE_FLAGS = ["out", "lang", "limit", "effort", "videos"];
+export const VALUE_FLAGS = ["out", "lang", "limit", "effort", "videos", "summary", "to"];
 export const BOOL_FLAGS = ["json", "refresh"];
-export const COMMANDS = ["fetch", "search", "frames", "list", "check", "doctor"];
+export const COMMANDS = ["fetch", "search", "frames", "list", "check", "html", "doctor"];
 
 const SPEC: CliSpec = { commands: COMMANDS, valueFlags: VALUE_FLAGS, boolFlags: BOOL_FLAGS };
 const YTDLP_STALE_DAYS = 60;
@@ -259,6 +267,44 @@ async function run(args: CommandArgs): Promise<void> {
       for (const p of r.problems) process.stdout.write(`  ${p.line ? `line ${p.line}` : "note"}: ${p.message}\n`);
     }
     if (failing.length) process.exit(EXIT_FAILURE);
+    return;
+  }
+
+  if (cmd === "html") {
+    const target = args.positional[0];
+    if (!target) usage("usage: ultrawatch html <url|file|id|dir> [--summary <answer.md>] [--to <page.html>] [--out <dir>] [--json]");
+    let runDir: string;
+    if (isLocalVideo(target)) {
+      const r = await fetchLocalRun(target, root, { lang: argValue(args, "lang") });
+      if (!r.ok) fail(`no transcript for ${target}: ${r.reason}`);
+      runDir = r.dir;
+    } else if (/^https?:\/\//i.test(target)) {
+      const r = await fetchVideoRun(target, root, { lang: argValue(args, "lang") });
+      if (!r.ok) fail(`no transcript for ${target}: ${r.reason}`);
+      runDir = r.dir;
+    } else runDir = existsSync(join(root, target, "meta.json")) ? join(root, target) : resolve(target);
+    const summaryFile = argValue(args, "summary");
+    let summary: string | undefined;
+    if (summaryFile !== undefined) {
+      try {
+        summary = readFileSync(summaryFile, "utf8");
+      } catch {
+        fail(`cannot read ${summaryFile}`);
+      }
+    }
+    const to = resolve(argValue(args, "to") ?? join(runDir, "index.html"));
+    const r = runHtml(runDir, { summary, to, lang: argValue(args, "lang") });
+    if ("error" in r) fail(r.error);
+    if (isNoWrite()) {
+      process.stdout.write(r.html);
+      return;
+    }
+    try {
+      writeFileSync(to, r.html);
+    } catch (e) {
+      fail(`cannot write ${to}: ${(e as Error).message}`);
+    }
+    process.stdout.write(asJson ? jsonLine({ ok: true, dir: runDir, html: to }) : `${to}\n`);
     return;
   }
 

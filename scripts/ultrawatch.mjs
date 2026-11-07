@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { existsSync as existsSync9, readFileSync as readFileSync10, realpathSync as realpathSync2 } from "fs";
-import { join as join13, resolve as resolve5 } from "path";
-import { pathToFileURL as pathToFileURL2 } from "url";
+import { existsSync as existsSync10, readFileSync as readFileSync11, realpathSync as realpathSync2, writeFileSync } from "fs";
+import { join as join14, resolve as resolve5 } from "path";
+import { pathToFileURL as pathToFileURL3 } from "url";
 
 // src/check.ts
 import { existsSync, readFileSync as readFileSync2 } from "fs";
@@ -5228,8 +5228,8 @@ function canonicalHref(clean3) {
   for (const m of head.matchAll(/<(link|meta)(?=[\s/>])(?:[^<>"']|"[^"]*"|'[^']*')*>/gi)) {
     const attrs = htmlAttributes(m[0]);
     if (m[1].toLowerCase() === "link") {
-      const href = attrs.get("href")?.trim();
-      if (href && (attrs.get("rel") ?? "").toLowerCase().split(/\s+/).includes("canonical")) return decodeEntities(href);
+      const href2 = attrs.get("href")?.trim();
+      if (href2 && (attrs.get("rel") ?? "").toLowerCase().split(/\s+/).includes("canonical")) return decodeEntities(href2);
     } else if (og === void 0 && attrs.get("property")?.toLowerCase() === "og:url") {
       og = attrs.get("content")?.trim() || void 0;
     }
@@ -5478,8 +5478,8 @@ function isHeaderRow(cells) {
 }
 function tableToMarkdown(table) {
   const width = table.rows.reduce((w, r) => Math.max(w, r.length), Math.max(table.headers.length, 1));
-  const esc = (s) => s.replace(/\|/g, "\\|");
-  const line = (cells) => `| ${Array.from({ length: width }, (_, i) => esc(cells[i] ?? "")).join(" | ")} |`;
+  const esc2 = (s) => s.replace(/\|/g, "\\|");
+  const line = (cells) => `| ${Array.from({ length: width }, (_, i) => esc2(cells[i] ?? "")).join(" | ")} |`;
   const out = [];
   if (table.caption) out.push(`**${table.caption}**`, "");
   out.push(line(table.headers.length ? table.headers : Array.from({ length: width }, () => "")));
@@ -5665,8 +5665,8 @@ function markdownAgainst(html, base2, fullPage) {
       if (adjacentLinks) w.space();
       if (kind === "a") {
         w.close("a");
-        const href = htmlAttributes(t).get("href");
-        w.open("a", linkTarget(href, base2), href?.trimStart().startsWith("#"));
+        const href2 = htmlAttributes(t).get("href");
+        w.open("a", linkTarget(href2, base2), href2?.trimStart().startsWith("#"));
       } else w.open(kind);
       continue;
     }
@@ -5735,13 +5735,13 @@ function longestRun(s, ch) {
   return best;
 }
 function linkTarget(raw, base2) {
-  const href = raw === void 0 ? "" : afterControls(decodeEntities(raw).replace(/[\t\n\r]/g, "")).trim();
-  if (!href || UNFOLLOWABLE.test(href)) return void 0;
+  const href2 = raw === void 0 ? "" : afterControls(decodeEntities(raw).replace(/[\t\n\r]/g, "")).trim();
+  if (!href2 || UNFOLLOWABLE.test(href2)) return void 0;
   try {
-    const url = new URL(href, base2);
+    const url = new URL(href2, base2);
     return UNFOLLOWABLE.test(url.protocol) ? void 0 : url.href;
   } catch {
-    return base2 === void 0 ? href : void 0;
+    return base2 === void 0 ? href2 : void 0;
   }
 }
 function afterControls(s) {
@@ -5761,10 +5761,10 @@ function destination(url) {
 function documentBaseUrl(html, pageUrl) {
   if (!/<base[\s/>]/i.test(html)) return pageUrl;
   for (const m of dropElements(html, ["script", "style", "template"], RAW_TEXT_ELEMENTS).matchAll(BASE_TAG)) {
-    const href = htmlAttributes(m[0]).get("href");
-    if (href === void 0) continue;
+    const href2 = htmlAttributes(m[0]).get("href");
+    if (href2 === void 0) continue;
     try {
-      const base2 = new URL(decodeEntities(href).trim(), pageUrl);
+      const base2 = new URL(decodeEntities(href2).trim(), pageUrl);
       return base2.protocol === "data:" || base2.protocol === "javascript:" ? pageUrl : base2.href;
     } catch {
       return pageUrl;
@@ -5868,10 +5868,10 @@ var init_markdown2 = __esm({
           this.pendingSpace = false;
         }
       }
-      open(kind, href, self) {
+      open(kind, href2, self) {
         if (this.frames.length >= MAX_INLINE_DEPTH) return;
-        const inert = kind === "a" && href === void 0 || this.inCode() || kind !== "a" && this.frames.some((f) => f.kind === kind);
-        this.frames.push({ kind, start: this.parts.length, ...href !== void 0 ? { href } : {}, ...self ? { self } : {}, ...inert ? { inert } : {} });
+        const inert = kind === "a" && href2 === void 0 || this.inCode() || kind !== "a" && this.frames.some((f) => f.kind === kind);
+        this.frames.push({ kind, start: this.parts.length, ...href2 !== void 0 ? { href: href2 } : {}, ...self ? { self } : {}, ...inert ? { inert } : {} });
       }
       /** Close the innermost open `kind`, and whatever opened inside it and never closed. */
       close(kind) {
@@ -6395,10 +6395,10 @@ ${slot}
 function pageTitleIn(clean3) {
   return firstElementText(clean3, "title") ?? metaContent(clean3, ["og:title", "twitter:title"]) ?? firstElementText(clean3, "h1");
 }
-function absoluteCanonical(href, base2) {
-  if (!href) return void 0;
+function absoluteCanonical(href2, base2) {
+  if (!href2) return void 0;
   try {
-    const u = new URL(href, base2);
+    const u = new URL(href2, base2);
     return u.protocol === "http:" || u.protocol === "https:" ? u.href : void 0;
   } catch {
     return void 0;
@@ -7406,8 +7406,8 @@ function checker(page, cond, now, net) {
   if ("url" in cond) {
     const match = urlMatcher(cond.url);
     return async () => {
-      const href = await evaluate(page, "location.href");
-      return typeof href === "string" && match(href);
+      const href2 = await evaluate(page, "location.href");
+      return typeof href2 === "string" && match(href2);
     };
   }
   if ("load" in cond) return async () => await evaluate(page, 'document.readyState === "complete"') === true;
@@ -7874,15 +7874,15 @@ var INLINE_TAG = /<\/?(?:a|abbr|b|bdi|bdo|cite|code|em|i|kbd|mark|q|s|samp|small
 function stripTags(s) {
   return decodeEntities(s.replace(INLINE_TAG, "").replace(/<[^<>]*>/g, " ")).replace(/\s+/g, " ").trim();
 }
-function ddgRedirectTarget(href) {
-  const uddg = /[?&]uddg=([^&]+)/.exec(href);
+function ddgRedirectTarget(href2) {
+  const uddg = /[?&]uddg=([^&]+)/.exec(href2);
   if (uddg) {
     try {
       return decodeURIComponent(uddg[1]);
     } catch {
     }
   }
-  return href.startsWith("//") ? `https:${href}` : href;
+  return href2.startsWith("//") ? `https:${href2}` : href2;
 }
 var attrPattern = (name) => new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'<>=\`]+))`, "i");
 var HREF_ATTR = attrPattern("href");
@@ -7917,9 +7917,9 @@ function parseBlocks(body, limit, shape) {
     const a = anchors[i];
     const block = body.slice(a.end, anchors[i + 1]?.start ?? body.length);
     const close = /<\/a\s*>/i.exec(block);
-    const href = attr2(a.attrs, HREF_ATTR);
-    if (!close || !href) continue;
-    const url = shape.resolve(href);
+    const href2 = attr2(a.attrs, HREF_ATTR);
+    if (!close || !href2) continue;
+    const url = shape.resolve(href2);
     if (!url) continue;
     const rest = block.slice(close.index + close[0].length);
     found.push({ url, title: stripTags(block.slice(0, close.index)) || url, snippet: elementText(rest, shape.snippet) });
@@ -7935,10 +7935,10 @@ function elementText(html, el) {
   }
   return "";
 }
-function ddgDestination(href) {
-  const url = ddgRedirectTarget(href);
+function ddgDestination(href2) {
+  const url = ddgRedirectTarget(href2);
   if (!/^https?:\/\//i.test(url)) return void 0;
-  const unwrapped = url !== (href.startsWith("//") ? `https:${href}` : href);
+  const unwrapped = url !== (href2.startsWith("//") ? `https:${href2}` : href2);
   return unwrapped || !hostIs(url, "duckduckgo.com") ? url : void 0;
 }
 function parseDdgHtml(body, limit = 50) {
@@ -8445,12 +8445,327 @@ function judge(tok, videos, line) {
   return [{ line, kind: "no-segment", message: `[${tok}] \u2014 nothing is said or shown in ${label} around ${stamp[2]} (\xB1${SLACK_S} s)` }];
 }
 
+// src/html.ts
+import { existsSync as existsSync8, readFileSync as readFileSync9 } from "fs";
+import { dirname, isAbsolute, join as join12, relative, sep as sep2 } from "path";
+import { pathToFileURL } from "url";
+var LABELS = {
+  en: {
+    summary: "Summary",
+    chapters: "Chapters",
+    frames: "Frames",
+    transcript: "Transcript",
+    search: "Search the video\u2026",
+    searchAria: "Search the transcript",
+    follow: "follow playback",
+    source: "source",
+    open: "Open the video",
+    noPlay: "Won't play?",
+    onSite: "Watch on YouTube",
+    at: "Frame at",
+    whisper: "local whisper transcription",
+    passage: "passage",
+    passages: "passages"
+  },
+  fr: {
+    summary: "R\xE9sum\xE9",
+    chapters: "Chapitres",
+    frames: "Images",
+    transcript: "Transcript",
+    search: "Chercher dans la vid\xE9o\u2026",
+    searchAria: "Chercher dans le transcript",
+    follow: "suivre la lecture",
+    source: "source",
+    open: "Ouvrir la vid\xE9o",
+    noPlay: "Ne se lit pas ?",
+    onSite: "Voir sur YouTube",
+    at: "Image \xE0",
+    whisper: "transcription whisper locale",
+    passage: "passage",
+    passages: "passages"
+  }
+};
+var esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function stampSeconds2(stamp) {
+  if (!/^\d{1,2}(?::\d{2}){1,2}$/.test(stamp)) return void 0;
+  return stamp.split(":").reduce((n, p) => n * 60 + Number(p), 0);
+}
+var seek = (t, label) => `<button type="button" class="stamp" data-t="${Math.floor(t)}">${esc(label)}</button>`;
+function inline(raw) {
+  const codes = [];
+  let s = esc(raw).replace(/`([^`]+)`/g, (_, c) => `\uE000${codes.push(c) - 1}\uE000`);
+  s = s.replace(/\[((?:V\d+|M)\b[^\]]*)\](?:\((https?:[^)\s]+)\))?/g, (_, body) => {
+    let video = "";
+    const parts = body.split(/[;,]/).map((part) => {
+      const m = /^\s*(?:(V\d+)\s+)?(M|\d{1,2}(?::\d{2}){1,2})\s*$/.exec(part);
+      if (!m) return esc(part.trim());
+      video = m[1] ?? video;
+      const t = stampSeconds2(m[2]);
+      if (t === void 0 || video && video !== "V1") return `${video ? `${video} ` : ""}${m[2]}`;
+      return seek(t, m[2]);
+    });
+    return `<span class="cite">${parts.join(" ")}</span>`;
+  });
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>').replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/(^|[^*\w])\*([^*\s][^*]*)\*/g, "$1<em>$2</em>").replace(/(^|\W)_([^_\s][^_]*)_(?=\W|$)/g, "$1<em>$2</em>");
+  return s.replace(/\uE000(\d+)\uE000/g, (_, i) => `<code>${codes[Number(i)]}</code>`);
+}
+function markdownToHtml(md) {
+  const out = [];
+  const toc = [];
+  const lines = md.replace(/\r\n?/g, "\n").split("\n");
+  let para = [];
+  let list;
+  let quote = [];
+  const flush = () => {
+    if (para.length) out.push(`<p>${inline(para.join(" "))}</p>`);
+    para = [];
+    if (list) out.push(`<${list.tag}>${list.items.map((i) => `<li>${inline(i)}</li>`).join("")}</${list.tag}>`);
+    list = void 0;
+    if (quote.length) out.push(`<blockquote>${inline(quote.join(" "))}</blockquote>`);
+    quote = [];
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const h = /^(#{1,4})\s+(.*)$/.exec(line);
+    const li = /^\s*(?:([-*+])|(\d+)[.)])\s+(.*)$/.exec(line);
+    if (!line.trim()) flush();
+    else if (h) {
+      flush();
+      const level = h[1].length;
+      const id = `s${toc.length + 1}`;
+      toc.push({ id, title: h[2].replace(/\[[^\]]*\]/g, "").trim(), level });
+      out.push(`<h${level + 1} id="${id}">${inline(h[2])}</h${level + 1}>`);
+    } else if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
+      flush();
+      out.push("<hr>");
+    } else if (/^\s*\|.*\|\s*$/.test(line) && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] ?? "")) {
+      flush();
+      const cells = (l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+      const head = cells(line);
+      i++;
+      const rows = [];
+      while (i + 1 < lines.length && /^\s*\|.*\|\s*$/.test(lines[i + 1])) rows.push(cells(lines[++i]));
+      out.push(
+        `<table><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`
+      );
+    } else if (/^\s*>/.test(line)) {
+      if (para.length || list) flush();
+      quote.push(line.replace(/^\s*>\s?/, ""));
+    } else if (li) {
+      const tag = li[1] ? "ul" : "ol";
+      if (para.length || quote.length || list && list.tag !== tag) flush();
+      list ??= { tag, items: [] };
+      list.items.push(li[3]);
+    } else if (list && /^\s+\S/.test(line)) list.items[list.items.length - 1] += ` ${line.trim()}`;
+    else {
+      if (list || quote.length) flush();
+      para.push(line.trim());
+    }
+  }
+  flush();
+  return { html: out.join("\n"), toc };
+}
+function readFrames(runDir) {
+  try {
+    const raw = JSON.parse(readFileSync9(join12(runDir, "frames.json"), "utf8"));
+    return Array.isArray(raw) ? raw.filter((f) => typeof f.file === "string" && Number.isFinite(f.time)) : [];
+  } catch {
+    return [];
+  }
+}
+function href(target, pageDir) {
+  const rel = relative(pageDir, target);
+  if (!rel.startsWith("..") && !isAbsolute(rel)) return rel.split(sep2).map(encodeURIComponent).join("/");
+  return pathToFileURL(target).href;
+}
+function player(meta, pageDir, L) {
+  const file = typeof meta.file === "string" && existsSync8(meta.file) ? meta.file : void 0;
+  const yt = /[?&]v=([A-Za-z0-9_-]{11})/.exec(meta.webpageUrl)?.[1];
+  if (file)
+    return {
+      kind: "video",
+      html: `<video id="player" controls preload="metadata" src="${esc(href(file, pageDir))}"></video>${yt ? `<p class="fallback">${L.noPlay} <a href="${esc(meta.webpageUrl)}" target="_blank" rel="noopener">${L.onSite}</a></p>` : ""}`
+    };
+  if (yt)
+    return {
+      kind: "youtube",
+      html: `<div class="frame"><iframe id="player" data-yt="${yt}" src="https://www.youtube-nocookie.com/embed/${yt}" title="YouTube" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`
+    };
+  return { kind: "link", html: `<p><a id="player" href="${esc(meta.webpageUrl)}" target="_blank" rel="noopener">${L.open}</a></p>` };
+}
+function runHtml(runDir, opts) {
+  const run2 = readVideoRun(runDir);
+  if (!run2) return { error: `no video run in ${runDir} \u2014 fetch the video first` };
+  const meta = run2.meta;
+  const segments = run2.segments;
+  const pageDir = dirname(opts.to);
+  const frames = readFrames(runDir);
+  const chapters = [...meta.chapters ?? []].sort((a, b) => a.start - b.start);
+  const lang = (opts.lang ?? meta.lang ?? meta.language ?? "en").toLowerCase().split(/[-_]/)[0];
+  const L = lang === "fr" ? LABELS.fr : LABELS.en;
+  const p = player(meta, pageDir, L);
+  const summary = opts.summary ? markdownToHtml(opts.summary) : void 0;
+  const facts = [
+    meta.channel,
+    meta.uploadDate,
+    meta.duration !== void 0 ? formatStamp(meta.duration) : void 0,
+    meta.via === "whisper" ? L.whisper : meta.via
+  ].filter(Boolean);
+  const body = [];
+  let c = -1;
+  let f = 0;
+  for (const s of segments) {
+    while (c + 1 < chapters.length && chapters[c + 1].start <= s.start + 0.5) {
+      c++;
+      body.push(`<h3 class="chapter" id="c${c}">${seek(chapters[c].start, formatStamp(chapters[c].start))} ${esc(chapters[c].title)}</h3>`);
+    }
+    const shots = [];
+    while (f < frames.length && frames[f].time < s.end + 0.5) {
+      const fr = frames[f++];
+      shots.push(
+        `<figure>${seek(fr.time, fr.stamp)}<img loading="lazy" src="${esc(href(join12(runDir, fr.file), pageDir))}" alt="${L.at} ${fr.stamp}"></figure>`
+      );
+    }
+    body.push(
+      `<p class="seg" data-start="${s.start}" data-end="${s.end}">${seek(s.start, formatStamp(s.start))} <span>${esc(s.text)}</span></p>${shots.length ? `<div class="shots">${shots.join("")}</div>` : ""}`
+    );
+  }
+  const nav = [
+    summary?.toc.length ? `<h2>${L.summary}</h2><ol class="toc">${summary.toc.filter((t) => t.level <= 2).map((t) => `<li><a href="#${t.id}">${esc(t.title)}</a></li>`).join("")}</ol>` : "",
+    chapters.length ? `<h2>${L.chapters}</h2><ol class="toc">${chapters.map((ch, i) => `<li>${seek(ch.start, formatStamp(ch.start))} <a href="#c${i}">${esc(ch.title)}</a></li>`).join("")}</ol>` : "",
+    frames.length ? `<h2>${L.frames} (${frames.length})</h2><div class="thumbs">${frames.map(
+      (fr) => `<button type="button" class="stamp thumb" data-t="${Math.floor(fr.time)}" title="${fr.stamp}"><img loading="lazy" src="${esc(href(join12(runDir, fr.file), pageDir))}" alt="${fr.stamp}"></button>`
+    ).join("")}</div>` : ""
+  ].join("");
+  const html = `<!DOCTYPE html>
+<html lang="${esc(lang)}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="ultrawatch">
+<title>${esc(meta.title)}</title>
+<style>${CSS}</style>
+</head>
+<body data-player="${p.kind}" data-page="${esc(meta.webpageUrl)}" data-passage="${L.passage}" data-passages="${L.passages}">
+<header class="top">
+  <h1>${esc(meta.title)}</h1>
+  <p class="facts">${facts.map((x) => esc(String(x))).join(" \xB7 ")} \xB7 <a href="${esc(meta.webpageUrl)}" target="_blank" rel="noopener">${L.source}</a></p>
+</header>
+<div class="layout">
+  <aside class="side">
+    <div class="player">${p.html}</div>
+    <nav>${nav}</nav>
+  </aside>
+  <main>
+    ${summary ? `<section class="summary"><h2 class="kicker">${L.summary}</h2>${summary.html}</section>` : ""}
+    <section class="transcript">
+      <div class="tbar"><h2 class="kicker">${L.transcript}</h2><input id="q" type="search" placeholder="${L.search}" aria-label="${L.searchAria}"><label><input id="follow" type="checkbox" checked> ${L.follow}</label><span id="count"></span></div>
+      ${body.join("\n")}
+    </section>
+  </main>
+</div>
+<script>${SCRIPT}</script>
+</body>
+</html>
+`;
+  return { html };
+}
+var SCRIPT = `(() => {
+const kind = document.body.dataset.player;
+const player = document.getElementById("player");
+const page = document.body.dataset.page;
+const segs = [...document.querySelectorAll(".seg")];
+const follow = document.getElementById("follow");
+function go(t) {
+  if (kind === "video") { player.currentTime = t; player.play().catch(() => {}); }
+  else if (kind === "youtube") { player.src = "https://www.youtube-nocookie.com/embed/" + player.dataset.yt + "?start=" + t + "&autoplay=1"; }
+  else { const u = new URL(page); u.searchParams.set("t", t + "s"); window.open(u, "_blank", "noopener"); }
+  mark(t, true);
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest(".stamp");
+  if (b) { e.preventDefault(); go(Number(b.dataset.t)); }
+});
+let current;
+function mark(t, scroll) {
+  const s = segs.findLast ? segs.findLast((x) => Number(x.dataset.start) <= t + 0.5) : segs.filter((x) => Number(x.dataset.start) <= t + 0.5).pop();
+  if (!s || s === current) return;
+  current?.classList.remove("now");
+  s.classList.add("now");
+  current = s;
+  if (scroll && follow.checked && !document.getElementById("q").value) s.scrollIntoView({ block: "center", behavior: "smooth" });
+}
+if (kind === "video") player.addEventListener("timeupdate", () => mark(player.currentTime, true));
+const q = document.getElementById("q");
+const count = document.getElementById("count");
+const fold = (s) => s.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
+q.addEventListener("input", () => {
+  const v = fold(q.value.trim());
+  let n = 0;
+  for (const s of segs) {
+    const hit = !v || fold(s.textContent).includes(v);
+    s.hidden = !hit;
+    if (s.nextElementSibling?.classList.contains("shots")) s.nextElementSibling.hidden = !hit;
+    if (hit && v) n++;
+  }
+  document.querySelectorAll(".chapter").forEach((h) => (h.hidden = !!v));
+  count.textContent = v ? n + " " + (n === 1 ? document.body.dataset.passage : document.body.dataset.passages) : "";
+});
+})();`;
+var CSS = `
+:root{--bg:#fbfaf7;--fg:#1d1c1a;--muted:#6b675f;--line:#e4e0d8;--accent:#b4441b;--soft:#f3efe6;--now:#fff1c2;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--bg:#161513;--fg:#ebe7df;--muted:#a19b90;--line:#2d2b27;--accent:#ef8a5b;--soft:#201f1c;--now:#3a3218}}
+*{box-sizing:border-box}
+html{scroll-padding-top:5rem}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:var(--accent)}
+.top{padding:1.5rem clamp(1rem,3vw,2.5rem) 1rem;border-bottom:1px solid var(--line)}
+h1{font-size:clamp(1.3rem,2.4vw,1.9rem);line-height:1.25;margin:0 0 .35rem;max-width:60ch;text-wrap:balance}
+.facts{margin:0;color:var(--muted);font-size:.9rem}
+.layout{display:grid;grid-template-columns:minmax(320px,38%) 1fr;gap:clamp(1rem,3vw,2.5rem);padding:1.25rem clamp(1rem,3vw,2.5rem) 4rem}
+.side{position:sticky;top:1rem;align-self:start;max-height:calc(100vh - 2rem);overflow:auto;padding-right:.25rem}
+video,.frame{width:100%;border-radius:8px;background:#000;display:block}
+.frame{aspect-ratio:16/9}.frame iframe{width:100%;height:100%;border:0;border-radius:8px}
+.fallback{font-size:.8rem;color:var(--muted);margin:.35rem 0 0}
+nav h2,.kicker{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:1.5rem 0 .5rem;font-weight:600}
+.toc{margin:0;padding-left:1.2rem;font-size:.92rem}.toc li{margin:.2rem 0}
+.toc a{color:var(--fg);text-decoration:none}.toc a:hover{color:var(--accent)}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:.4rem}
+.thumb{padding:0;border:0;background:none;cursor:pointer;border-radius:4px;overflow:hidden}
+.thumb img{width:100%;display:block;aspect-ratio:16/9;object-fit:cover;transition:opacity .15s}.thumb:hover img{opacity:.75}
+main{min-width:0;max-width:75ch}
+.summary{border-bottom:1px solid var(--line);padding-bottom:1.5rem;margin-bottom:1rem}
+.summary h2,.summary h3,.summary h4{line-height:1.3;margin:1.6rem 0 .5rem;text-wrap:balance}
+.summary h2{font-size:1.3rem}.summary h3{font-size:1.1rem}.summary h4{font-size:1rem}
+.summary li{margin:.35rem 0}
+blockquote{margin:1rem 0;padding:.25rem 0 .25rem 1rem;border-left:3px solid var(--accent);color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:.92rem;margin:1rem 0}th,td{border-bottom:1px solid var(--line);padding:.4rem .5rem;text-align:left;vertical-align:top}
+code{background:var(--soft);padding:.05rem .3rem;border-radius:3px;font-size:.88em}
+hr{border:0;border-top:1px solid var(--line);margin:1.5rem 0}
+.cite{white-space:nowrap}
+.stamp{font:600 .78rem/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent);background:var(--soft);border:1px solid var(--line);border-radius:4px;padding:.18rem .35rem;cursor:pointer;vertical-align:.08em}
+.stamp:hover{border-color:var(--accent)}.stamp:focus-visible,.thumb:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tbar{position:sticky;top:0;z-index:1;background:var(--bg);display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem;padding:.5rem 0;border-bottom:1px solid var(--line)}
+.tbar .kicker{margin:0}
+#q{flex:1;min-width:12rem;font:inherit;padding:.4rem .6rem;border:1px solid var(--line);border-radius:6px;background:var(--soft);color:var(--fg)}
+.tbar label,#count{font-size:.85rem;color:var(--muted)}
+.chapter{font-size:1.05rem;margin:1.75rem 0 .5rem}
+.seg{margin:.5rem 0;padding:.35rem .5rem;border-radius:6px;transition:background .2s}
+.seg.now{background:var(--now)}
+.shots{display:flex;gap:.5rem;overflow-x:auto;margin:.25rem 0 .75rem .5rem}
+.shots figure{margin:0;flex:0 0 min(320px,80%);position:relative}
+.shots img{width:100%;border-radius:6px;display:block}
+.shots .stamp{position:absolute;top:.4rem;left:.4rem}
+@media (max-width:860px){.layout{grid-template-columns:1fr}.side{position:static;max-height:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+`;
+
 // src/local.ts
 import { createHash as createHash2 } from "crypto";
-import { existsSync as existsSync8, mkdtempSync, readdirSync as readdirSync6, readFileSync as readFileSync9, rmSync, statSync as statSync6, symlinkSync } from "fs";
+import { existsSync as existsSync9, mkdtempSync, readdirSync as readdirSync6, readFileSync as readFileSync10, rmSync, statSync as statSync6, symlinkSync } from "fs";
 import { tmpdir as tmpdir2 } from "os";
-import { basename as basename3, dirname, extname, join as join12, resolve as resolve4 } from "path";
-import { pathToFileURL } from "url";
+import { basename as basename3, dirname as dirname2, extname, join as join13, resolve as resolve4 } from "path";
+import { pathToFileURL as pathToFileURL2 } from "url";
 function isLocalVideo(target) {
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target)) return false;
   try {
@@ -8485,7 +8800,7 @@ function sidecarVtt(path, lang) {
   const stem = basename3(path, extname(path));
   let names;
   try {
-    names = readdirSync6(dirname(path));
+    names = readdirSync6(dirname2(path));
   } catch {
     return void 0;
   }
@@ -8494,7 +8809,7 @@ function sidecarVtt(path, lang) {
   const pick2 = want && subs.find(
     (n) => n.slice(stem.length + 1, -4).toLowerCase().split(/[-_]/)[0] === want
   ) || (want ? void 0 : subs[0]);
-  return pick2 ? join12(dirname(path), pick2) : void 0;
+  return pick2 ? join13(dirname2(path), pick2) : void 0;
 }
 function whisperSegments2(json2) {
   try {
@@ -8513,14 +8828,14 @@ async function whisperLocal(path, duration, lang, run2) {
   const budget = Number.isFinite(fromEnv) && fromEnv >= 1e3 ? fromEnv : Math.max(30 * 6e4, (duration ?? 0) * 1e3);
   const deadline = Date.now() + budget;
   const left = () => Math.max(1e3, deadline - Date.now());
-  const dir = mkdtempSync(join12(tmpdir2(), "ultrawatch-local-"));
+  const dir = mkdtempSync(join13(tmpdir2(), "ultrawatch-local-"));
   try {
-    const wav = join12(dir, "speech.wav");
+    const wav = join13(dir, "speech.wav");
     const ff = await run2("ffmpeg", ["-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", path, "-vn", "-ar", "16000", "-ac", "1", wav], {
       timeoutMs: left()
     });
     if (ff.missing) return { failed: "whisper needs ffmpeg" };
-    if (!ff.ok || !existsSync8(wav)) return { failed: `ffmpeg could not extract the audio: ${ff.stderr.trim().split("\n").pop() ?? ""}` };
+    if (!ff.ok || !existsSync9(wav)) return { failed: `ffmpeg could not extract the audio: ${ff.stderr.trim().split("\n").pop() ?? ""}` };
     const args = [
       "--with",
       "av<18",
@@ -8540,9 +8855,9 @@ async function whisperLocal(path, duration, lang, run2) {
     const w = await run2("uvx", args, { timeoutMs: left(), cwd: dir });
     if (w.missing) return { failed: "whisper needs uvx (https://docs.astral.sh/uv/)" };
     if (w.status === 124) return { failed: `whisper timed out after ${Math.round(budget / 6e4)} min (${envName("WHISPER_TIMEOUT_MS")})` };
-    const out = join12(dir, "speech.json");
-    if (!w.ok || !existsSync8(out)) return { failed: `whisper: ${w.stderr.trim().split("\n").pop() || "failed"}` };
-    return { segments: whisperSegments2(readFileSync9(out, "utf8")) };
+    const out = join13(dir, "speech.json");
+    if (!w.ok || !existsSync9(out)) return { failed: `whisper: ${w.stderr.trim().split("\n").pop() || "failed"}` };
+    return { segments: whisperSegments2(readFileSync10(out, "utf8")) };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -8551,11 +8866,11 @@ async function fetchLocalRun(file, root, opts = {}) {
   const path = resolve4(file);
   const run2 = opts.run ?? shAsync;
   const { key, title, youtubeId } = localIdentity(path);
-  const dir = join12(root, key);
-  const transcriptPath = join12(dir, "TRANSCRIPT.md");
+  const dir = join13(root, key);
+  const transcriptPath = join13(dir, "TRANSCRIPT.md");
   if (!opts.refresh) {
     const kept = readVideoRun(dir);
-    if (kept && existsSync8(transcriptPath) && (!opts.lang || kept.meta.lang === opts.lang))
+    if (kept && existsSync9(transcriptPath) && (!opts.lang || kept.meta.lang === opts.lang))
       return { ok: true, id: key, dir, transcript: transcriptPath, reused: true, meta: kept.meta, segments: kept.segments.length };
   }
   const probed = await ffprobe(path, run2);
@@ -8570,7 +8885,7 @@ async function fetchLocalRun(file, root, opts = {}) {
     chapters: probed.chapters,
     subtitles: [],
     autoCaptions: [],
-    webpageUrl: youtubeId ? `https://www.youtube.com/watch?v=${youtubeId}` : pathToFileURL(path).href
+    webpageUrl: youtubeId ? `https://www.youtube.com/watch?v=${youtubeId}` : pathToFileURL2(path).href
   };
   const starts = meta.chapters.map((c) => c.start);
   let segments;
@@ -8578,7 +8893,7 @@ async function fetchLocalRun(file, root, opts = {}) {
   let track2;
   const vtt = sidecarVtt(path, opts.lang);
   if (vtt) {
-    segments = mergeSegments(parseVtt(readFileSync9(vtt, "utf8")), starts);
+    segments = mergeSegments(parseVtt(readFileSync10(vtt, "utf8")), starts);
     via = "manual-subs";
     track2 = basename3(vtt).slice(basename3(path, extname(path)).length + 1, -4);
   } else {
@@ -8603,10 +8918,10 @@ async function fetchLocalRun(file, root, opts = {}) {
   if (isNoWrite()) return { ...done, markdown };
   try {
     ensureDir(dir);
-    writeArtifact(join12(dir, "segments.json"), `${JSON.stringify(segments, null, 1)}
+    writeArtifact(join13(dir, "segments.json"), `${JSON.stringify(segments, null, 1)}
 `);
     writeArtifact(transcriptPath, markdown);
-    writeArtifact(join12(dir, "meta.json"), `${JSON.stringify(runMeta, null, 2)}
+    writeArtifact(join13(dir, "meta.json"), `${JSON.stringify(runMeta, null, 2)}
 `);
   } catch (e) {
     return { ok: false, id: key, reason: `cannot write the run in ${dir}: ${e.message}` };
@@ -8648,6 +8963,7 @@ USAGE
   ultrawatch frames <url|file|id|dir> [--effort low|med|high] [--out <dir>] [--lang <tag>] [--json]
   ultrawatch list <playlist|channel> [--limit <n>] [--out <dir>] [--lang <tag>] [--refresh] [--json]
   ultrawatch check <run> <answer.md> [--videos <id,id,\u2026>] [--json]
+  ultrawatch html <url|file|id|dir> [--summary <answer.md>] [--to <page.html>] [--out <dir>] [--json]
   ultrawatch doctor [--json]
   ultrawatch version
 
@@ -8681,6 +8997,12 @@ COMMANDS
            video's directory, a corpus, or a directory of videos fetched one
            by one with --videos naming V1, V2\u2026 in order. Exits 1 with a
            line-by-line report otherwise; an answer with no claim fails too.
+  html     One self-contained page to watch and understand a video: the
+           player (the local file when the run was read from disk, else the
+           site's embed), --summary rendered with every [V1 mm:ss] a button
+           that seeks the player, the chapters, the frames, and the whole
+           transcript, searchable and following playback. Written to --to,
+           else <id>/index.html; nothing is fetched when it opens.
   doctor   yt-dlp (and how old it is), ffmpeg, uvx, the whisper model, the
            transcript rungs, and where runs are kept.
 
@@ -8692,13 +9014,13 @@ ENVIRONMENT
   ULTRAWATCH_WHISPER_MODEL, ULTRAWATCH_WHISPER_MAX, ULTRAWATCH_WHISPER_TIMEOUT_MS
                             whisper's model (small), videos per process (3), one video's budget (1800000)
   ULTRAWATCH_YTDLP_ARGS     extra yt-dlp flags on every call: browser cookies, a proxy
-  ULTRAWATCH_NO_WRITE       write nothing: fetch prints the transcript, frames and list refuse
+  ULTRAWATCH_NO_WRITE       write nothing: fetch and html print, frames and list refuse
 
 Nothing here needs an API key. yt-dlp is required; ffmpeg and uv (uvx) unlock
 frames and whisper.`;
-var VALUE_FLAGS = ["out", "lang", "limit", "effort", "videos"];
+var VALUE_FLAGS = ["out", "lang", "limit", "effort", "videos", "summary", "to"];
 var BOOL_FLAGS = ["json", "refresh"];
-var COMMANDS = ["fetch", "search", "frames", "list", "check", "doctor"];
+var COMMANDS = ["fetch", "search", "frames", "list", "check", "html", "doctor"];
 var SPEC = { commands: COMMANDS, valueFlags: VALUE_FLAGS, boolFlags: BOOL_FLAGS };
 var YTDLP_STALE_DAYS = 60;
 function fail(msg, code = EXIT_FAILURE) {
@@ -8716,7 +9038,7 @@ function videoList(args) {
 }
 function citeLabels(root, videos) {
   if (videos) return new Map(videos.map((id, i) => [id, `V${i + 1}`]));
-  if (existsSync9(join13(root, "corpus.json"))) return void 0;
+  if (existsSync10(join14(root, "corpus.json"))) return void 0;
   const runs = listVideoRuns(root);
   return runs.length === 1 ? /* @__PURE__ */ new Map([[runs[0].meta.id, "V1"]]) : void 0;
 }
@@ -8744,7 +9066,7 @@ async function run(args) {
       fail(`no transcript for ${url}: ${r.reason}`);
     }
     if (asJson) process.stdout.write(jsonLine({ ...r, title: r.meta.title, via: r.meta.via, duration: r.meta.duration }));
-    else if (isNoWrite()) process.stdout.write(r.markdown ?? readFileSync10(r.transcript, "utf8"));
+    else if (isNoWrite()) process.stdout.write(r.markdown ?? readFileSync11(r.transcript, "utf8"));
     else {
       const m = r.meta;
       const facts = [m.channel, m.duration !== void 0 ? formatStamp(m.duration) : void 0, m.via, plural2(r.segments, "segment")].filter(Boolean).join(" \xB7 ");
@@ -8781,7 +9103,7 @@ async function run(args) {
       const r2 = await fetchVideoRun(target, root, { lang: argValue(args, "lang") });
       if (!r2.ok) fail(`no transcript for ${target}: ${r2.reason}`);
       runDir = r2.dir;
-    } else runDir = existsSync9(join13(root, target, "meta.json")) ? join13(root, target) : resolve5(target);
+    } else runDir = existsSync10(join14(root, target, "meta.json")) ? join14(root, target) : resolve5(target);
     const localFile = localFileOf(runDir);
     const r = localFile ? await extractLocalFrames(runDir, localFile, { effort }) : await extractFrames(runDir, { effort });
     if (!r.ok) {
@@ -8827,7 +9149,7 @@ ${r.videos.map((v) => `  ${v.label.padEnd(4)}${v.dir ? `${(v.via ?? "").padEnd(1
     const videos = videoList(args);
     let answer;
     try {
-      answer = readFileSync10(file, "utf8");
+      answer = readFileSync11(file, "utf8");
     } catch {
       return fail(`cannot read ${file}`);
     }
@@ -8845,6 +9167,44 @@ ${r.videos.map((v) => `  ${v.label.padEnd(4)}${v.dir ? `${(v.via ?? "").padEnd(1
 `);
     }
     if (failing.length) process.exit(EXIT_FAILURE);
+    return;
+  }
+  if (cmd === "html") {
+    const target = args.positional[0];
+    if (!target) usage("usage: ultrawatch html <url|file|id|dir> [--summary <answer.md>] [--to <page.html>] [--out <dir>] [--json]");
+    let runDir;
+    if (isLocalVideo(target)) {
+      const r2 = await fetchLocalRun(target, root, { lang: argValue(args, "lang") });
+      if (!r2.ok) fail(`no transcript for ${target}: ${r2.reason}`);
+      runDir = r2.dir;
+    } else if (/^https?:\/\//i.test(target)) {
+      const r2 = await fetchVideoRun(target, root, { lang: argValue(args, "lang") });
+      if (!r2.ok) fail(`no transcript for ${target}: ${r2.reason}`);
+      runDir = r2.dir;
+    } else runDir = existsSync10(join14(root, target, "meta.json")) ? join14(root, target) : resolve5(target);
+    const summaryFile = argValue(args, "summary");
+    let summary;
+    if (summaryFile !== void 0) {
+      try {
+        summary = readFileSync11(summaryFile, "utf8");
+      } catch {
+        fail(`cannot read ${summaryFile}`);
+      }
+    }
+    const to = resolve5(argValue(args, "to") ?? join14(runDir, "index.html"));
+    const r = runHtml(runDir, { summary, to, lang: argValue(args, "lang") });
+    if ("error" in r) fail(r.error);
+    if (isNoWrite()) {
+      process.stdout.write(r.html);
+      return;
+    }
+    try {
+      writeFileSync(to, r.html);
+    } catch (e) {
+      fail(`cannot write ${to}: ${e.message}`);
+    }
+    process.stdout.write(asJson ? jsonLine({ ok: true, dir: runDir, html: to }) : `${to}
+`);
     return;
   }
   if (cmd === "doctor") {
@@ -8914,7 +9274,7 @@ async function main(argv) {
 }
 function isStartedFile() {
   try {
-    return !!process.argv[1] && pathToFileURL2(realpathSync2(process.argv[1])).href === import.meta.url;
+    return !!process.argv[1] && pathToFileURL3(realpathSync2(process.argv[1])).href === import.meta.url;
   } catch {
     return false;
   }
