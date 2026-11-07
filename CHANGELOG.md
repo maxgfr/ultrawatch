@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the [Conventional Commits](https://www.conventionalcommits.org/) by [semantic-release](https://github.com/semantic-release/semantic-release).
 
+## [1.5.2](https://github.com/maxgfr/ultrawatch/compare/v1.5.1...v1.5.2) (2026-11-07)
+
+
+### Performance Improvements
+
+* **frames:** decode keyframes only to find scenes in a local file ([d8b34fd](https://github.com/maxgfr/ultrawatch/commit/d8b34fd6d8a6f56e0d377b3ca752efe11a1d2dfc))
+
 ## [1.5.1](https://github.com/maxgfr/ultrawatch/compare/v1.5.0...v1.5.1) (2026-11-07)
 
 

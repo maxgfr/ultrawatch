@@ -9218,7 +9218,7 @@ async function extractLocalFrames(runDir, file, opts = {}) {
 }
 
 // src/version.ts
-var VERSION = "1.5.1";
+var VERSION = "1.5.2";
 
 // src/cli.ts
 var HELP = `ultrawatch v${VERSION} (webindex ${ENGINE_VERSION})
