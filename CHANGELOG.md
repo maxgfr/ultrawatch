@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the [Conventional Commits](https://www.conventionalcommits.org/) by [semantic-release](https://github.com/semantic-release/semantic-release).
 
+# [1.5.0](https://github.com/maxgfr/ultrawatch/compare/v1.4.1...v1.5.0) (2026-11-07)
+
+
+### Features
+
+* **html:** an overview with key figures, the outline, part lengths and speech rate ([0eaafe4](https://github.com/maxgfr/ultrawatch/commit/0eaafe4549964e706a0777e4542d3277cd2f9d00))
+
 ## [1.4.1](https://github.com/maxgfr/ultrawatch/compare/v1.4.0...v1.4.1) (2026-11-07)
 
 
