@@ -65,22 +65,25 @@ const seek = (t: number, label: string) => `<button type="button" class="stamp" 
 /**
  * Inline Markdown on already-escaped text: code, bold, italics, links, and
  * citations. `[V1 12:34; 13:00]` becomes one seek button per stamp of V1;
- * another video's stamps and `[M]` stay as text, set apart.
+ * another video's stamps stay as text, and `[M]` (grounded by the page's own
+ * header) is dropped with the space before it.
  */
 function inline(raw: string): string {
   const codes: string[] = [];
   let s = esc(raw).replace(/`([^`]+)`/g, (_, c: string) => `\uE000${codes.push(c) - 1}\uE000`);
-  s = s.replace(/\[((?:V\d+|M)\b[^\]]*)\](?:\((https?:[^)\s]+)\))?/g, (_, body: string) => {
+  s = s.replace(/(\s?)\[((?:V\d+|M)\b[^\]]*)\](?:\((https?:[^)\s]+)\))?/g, (_, space: string, body: string) => {
     let video = "";
     const parts = body.split(/[;,]/).map((part) => {
       const m = /^\s*(?:(V\d+)\s+)?(M|\d{1,2}(?::\d{2}){1,2})\s*$/.exec(part);
       if (!m) return esc(part.trim());
       video = m[1] ?? video;
+      if (m[2] === "M") return "";
       const t = stampSeconds(m[2]!);
       if (t === undefined || (video && video !== "V1")) return `${video ? `${video} ` : ""}${m[2]}`;
       return seek(t, m[2]!);
     });
-    return `<span class="cite">${parts.join(" ")}</span>`;
+    const shown = parts.filter(Boolean);
+    return shown.length ? `${space}<span class="cite">${shown.join(" ")}</span>` : "";
   });
   s = s
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
@@ -103,7 +106,8 @@ export function markdownToHtml(md: string): { html: string; toc: { id: string; t
     para = [];
     if (list) out.push(`<${list.tag}>${list.items.map((i) => `<li>${inline(i)}</li>`).join("")}</${list.tag}>`);
     list = undefined;
-    if (quote.length) out.push(`<blockquote>${inline(quote.join(" "))}</blockquote>`);
+    // A quote holds Markdown of its own: the "In short" box is a list in a quote.
+    if (quote.length) out.push(`<blockquote>${markdownToHtml(quote.join("\n")).html}</blockquote>`);
     quote = [];
   };
   for (let i = 0; i < lines.length; i++) {
@@ -210,7 +214,8 @@ export function runHtml(runDir: string, opts: HtmlOptions): { html: string } | {
   const lang = (opts.lang ?? (meta as { lang?: string }).lang ?? meta.language ?? "en").toLowerCase().split(/[-_]/)[0]!;
   const L: Labels = lang === "fr" ? LABELS.fr : LABELS.en;
   const p = player(meta, pageDir, L);
-  const summary = opts.summary ? markdownToHtml(opts.summary) : undefined;
+  // The page's header already carries the title: a summary's leading `# Title` would repeat it.
+  const summary = opts.summary ? markdownToHtml(opts.summary.replace(/^\s*#\s[^\n]*\n/, "")) : undefined;
 
   const facts = [
     meta.channel,
@@ -355,7 +360,7 @@ video,.frame{width:100%;border-radius:8px;background:#000;display:block}
 .frame{aspect-ratio:16/9}.frame iframe{width:100%;height:100%;border:0;border-radius:8px}
 .fallback{font-size:.8rem;color:var(--muted);margin:.35rem 0 0}
 nav h2,.kicker{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:1.5rem 0 .5rem;font-weight:600}
-.toc{margin:0;padding-left:1.2rem;font-size:.92rem}.toc li{margin:.2rem 0}
+.toc{margin:0;padding-left:2rem;font-size:.92rem}.toc li{margin:.2rem 0}
 .toc a{color:var(--fg);text-decoration:none}.toc a:hover{color:var(--accent)}
 .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:.4rem}
 .thumb{padding:0;border:0;background:none;cursor:pointer;border-radius:4px;overflow:hidden}
@@ -365,7 +370,7 @@ main{min-width:0;max-width:75ch}
 .summary h2,.summary h3,.summary h4{line-height:1.3;margin:1.6rem 0 .5rem;text-wrap:balance}
 .summary h2{font-size:1.3rem}.summary h3{font-size:1.1rem}.summary h4{font-size:1rem}
 .summary li{margin:.35rem 0}
-blockquote{margin:1rem 0;padding:.25rem 0 .25rem 1rem;border-left:3px solid var(--accent);color:var(--muted)}
+blockquote{margin:1.25rem 0;padding:.5rem 1rem;border-left:3px solid var(--accent);background:var(--soft);border-radius:0 6px 6px 0}blockquote>:first-child{margin-top:0}blockquote>:last-child{margin-bottom:0}
 table{border-collapse:collapse;width:100%;font-size:.92rem;margin:1rem 0}th,td{border-bottom:1px solid var(--line);padding:.4rem .5rem;text-align:left;vertical-align:top}
 code{background:var(--soft);padding:.05rem .3rem;border-radius:3px;font-size:.88em}
 hr{border:0;border-top:1px solid var(--line);margin:1.5rem 0}

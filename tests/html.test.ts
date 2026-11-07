@@ -33,6 +33,14 @@ describe("the summary's Markdown", () => {
     expect(html).toContain("<code>&lt;tag&gt;</code>");
   });
 
+  it("drops [M] with its space, and renders the Markdown inside a quote", () => {
+    expect(markdownToHtml("Two hours [M], then [V1 01:00; M].").html).toBe(
+      '<p>Two hours, then <span class="cite"><button type="button" class="stamp" data-t="60">01:00</button></span>.</p>',
+    );
+    const { html } = markdownToHtml("> **In short**\n>\n> - one [V1 00:10]\n> - two");
+    expect(html).toMatch(/^<blockquote><p><strong>In short<\/strong><\/p>\n<ul><li>one/);
+  });
+
   it("escapes what it does not render", () => {
     expect(markdownToHtml('<script>alert("x")</script>').html).not.toContain("<script>");
   });
@@ -45,6 +53,7 @@ describe("the page", () => {
     expect(r.html).toContain("youtube-nocookie.com/embed/iG9CE55wbtY");
     expect(r.html).toContain("Introduction");
     expect(r.html).toContain('class="summary"');
+    expect(r.html.match(/Do schools kill creativity\? — summary/g)).toBeNull();
     const segments = JSON.parse(readFileSync(join(TED, "segments.json"), "utf8")) as unknown[];
     expect(r.html.match(/class="seg"/g)).toHaveLength(segments.length);
     expect(r.html).not.toMatch(/<(?:script|link)[^>]+src=|<link[^>]+href=/);
