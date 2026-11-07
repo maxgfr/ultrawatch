@@ -1,13 +1,15 @@
 // `ultrawatch html <run>`: one self-contained page to watch and understand a
 // video. The player (the local file when the run was read from disk, else the
 // site's embed), the summary with every [V1 mm:ss] a button that seeks the
-// player there, the chapters, the frames, and the full transcript, searchable,
-// following playback. No script or style is fetched: it opens from disk.
+// player there, the chapters, the frames (--frames), and the full transcript, searchable,
+// marking the passage being played. Nothing scrolls on its own unless the
+// reader asks (--follow, or the checkbox). No script or style is fetched.
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { formatStamp, readVideoRun, type VideoSegment } from "./engine.js";
 import { OVERVIEW_CSS, OVERVIEW_SCRIPT, type OverviewLabels, overviewHtml } from "./overview.js";
+import { PLAYER_CSS, PLAYER_SCRIPT, type PlayerLabels, playerHtml } from "./player.js";
 import { stampSeconds } from "./stamps.js";
 
 export { stampSeconds };
@@ -53,6 +55,19 @@ const LABELS = {
     length: "Length",
     min: "min",
     locale: "en-US",
+    details: "Details",
+    point: "point",
+    points: "points",
+    expandAll: "Expand all",
+    collapseAll: "Collapse all",
+    local: "Local file",
+    youtube: "YouTube",
+    speed: "Speed",
+    sourceGroup: "Video source",
+    ytFromDisk:
+      "YouTube does not play in a page opened from disk (its error 153). Run <code>ultrawatch serve</code> in this folder and open the page from the address it prints, or:",
+    ytMax: "YouTube stops at 2×: use the local file",
+    decimal: ".",
   },
   fr: {
     summary: "Résumé",
@@ -88,9 +103,22 @@ const LABELS = {
     length: "Durée",
     min: "min",
     locale: "fr-FR",
+    details: "Détails",
+    point: "point",
+    points: "points",
+    expandAll: "Tout déplier",
+    collapseAll: "Tout replier",
+    local: "Fichier local",
+    youtube: "YouTube",
+    speed: "Vitesse",
+    sourceGroup: "Source de la vidéo",
+    ytFromDisk:
+      "YouTube refuse de jouer dans une page ouverte depuis le disque (son erreur 153). Lancez <code>ultrawatch serve</code> dans ce dossier et ouvrez la page à l'adresse affichée, ou :",
+    ytMax: "YouTube s'arrête à 2× : passez au fichier local",
+    decimal: ",",
   },
 };
-type Labels = (typeof LABELS)["en"] & OverviewLabels;
+type Labels = (typeof LABELS)["en"] & OverviewLabels & PlayerLabels;
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -127,10 +155,11 @@ function inline(raw: string): string {
   return s.replace(/\uE000(\d+)\uE000/g, (_, i: string) => `<code>${codes[Number(i)]}</code>`);
 }
 
-/** Headings, lists, quotes, rules, tables and paragraphs: what a summary uses. */
-export function markdownToHtml(md: string): { html: string; toc: { id: string; title: string; level: number }[] } {
+type TocEntry = { id: string; title: string; level: number };
+
+/** Headings, lists, quotes, rules, tables and paragraphs: what a summary uses. `toc` is shared across calls. */
+export function markdownToHtml(md: string, toc: TocEntry[] = []): { html: string; toc: TocEntry[] } {
   const out: string[] = [];
-  const toc: { id: string; title: string; level: number }[] = [];
   const lines = md.replace(/\r\n?/g, "\n").split("\n");
   let para: string[] = [];
   let list: { tag: "ul" | "ol"; items: string[] } | undefined;
@@ -141,7 +170,7 @@ export function markdownToHtml(md: string): { html: string; toc: { id: string; t
     if (list) out.push(`<${list.tag}>${list.items.map((i) => `<li>${inline(i)}</li>`).join("")}</${list.tag}>`);
     list = undefined;
     // A quote holds Markdown of its own: the "In short" box is a list in a quote.
-    if (quote.length) out.push(`<blockquote>${markdownToHtml(quote.join("\n")).html}</blockquote>`);
+    if (quote.length) out.push(`<blockquote>${markdownToHtml(quote.join("\n"), []).html}</blockquote>`);
     quote = [];
   };
   for (let i = 0; i < lines.length; i++) {
@@ -193,6 +222,40 @@ export function markdownToHtml(md: string): { html: string; toc: { id: string; t
   return { html: out.join("\n"), toc };
 }
 
+/**
+ * The summary, section by section: a `##` section that opens with a quote (its
+ * "In short") shows that brief, and folds its detailed points beneath it, so
+ * the page reads as prose first. Sections without one are shown whole.
+ */
+export function summaryToHtml(md: string, L: { details: string; point: string; points: string }): { html: string; toc: TocEntry[] } {
+  const toc: TocEntry[] = [];
+  const chunks: string[][] = [[]];
+  for (const line of md.replace(/\r\n?/g, "\n").split("\n")) {
+    if (/^##\s/.test(line)) chunks.push([]);
+    chunks[chunks.length - 1]!.push(line);
+  }
+  const out: string[] = [markdownToHtml(chunks[0]!.join("\n"), toc).html];
+  for (const chunk of chunks.slice(1)) {
+    const [heading, ...body] = chunk;
+    let i = 0;
+    while (i < body.length && !body[i]!.trim()) i++;
+    let j = i;
+    while (j < body.length && /^\s*>/.test(body[j]!)) j++;
+    const rest = body.slice(j).join("\n").trim();
+    const head = markdownToHtml(heading!, toc).html;
+    if (j === i || !rest) {
+      out.push(`<section class="part">${head}${markdownToHtml(body.join("\n"), toc).html}</section>`);
+      continue;
+    }
+    const brief = markdownToHtml(body.slice(i, j).join("\n"), toc).html.replace("<blockquote>", '<blockquote class="brief">');
+    const n = rest.split("\n").filter((l) => /^\s*(?:[-*+]|\d+[.)])\s+/.test(l)).length || rest.split(/\n\s*\n/).length;
+    out.push(
+      `<section class="part">${head}${brief}<details class="points"><summary>${esc(L.details)} · ${n} ${esc(n === 1 ? L.point : L.points)}</summary>${markdownToHtml(rest, toc).html}</details></section>`,
+    );
+  }
+  return { html: out.join("\n"), toc };
+}
+
 function readFrames(runDir: string): Frame[] {
   try {
     const raw = JSON.parse(readFileSync(join(runDir, "frames.json"), "utf8")) as Frame[];
@@ -209,22 +272,10 @@ function href(target: string, pageDir: string): string {
   return pathToFileURL(target).href;
 }
 
-function player(meta: { id: string; site?: string; webpageUrl: string; file?: unknown }, pageDir: string, L: Labels): { html: string; kind: string } {
+function player(meta: { webpageUrl: string; file?: unknown }, pageDir: string, L: Labels): { html: string; kind: string } {
   const file = typeof meta.file === "string" && existsSync(meta.file) ? meta.file : undefined;
-  const yt = /[?&]v=([A-Za-z0-9_-]{11})/.exec(meta.webpageUrl)?.[1];
-  if (file)
-    return {
-      kind: "video",
-      html: `<video id="player" controls preload="metadata" src="${esc(href(file, pageDir))}"></video>${
-        yt ? `<p class="fallback">${L.noPlay} <a href="${esc(meta.webpageUrl)}" target="_blank" rel="noopener">${L.onSite}</a></p>` : ""
-      }`,
-    };
-  if (yt)
-    return {
-      kind: "youtube",
-      html: `<div class="frame"><iframe id="player" data-yt="${yt}" src="https://www.youtube-nocookie.com/embed/${yt}" title="YouTube" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`,
-    };
-  return { kind: "link", html: `<p><a id="player" href="${esc(meta.webpageUrl)}" target="_blank" rel="noopener">${L.open}</a></p>` };
+  const youtubeId = /[?&]v=([A-Za-z0-9_-]{11})/.exec(meta.webpageUrl)?.[1];
+  return playerHtml({ file: file && href(file, pageDir), youtubeId, pageUrl: meta.webpageUrl }, L);
 }
 
 export interface HtmlOptions {
@@ -232,6 +283,10 @@ export interface HtmlOptions {
   summary?: string;
   /** Where the page will be written: relative links (frames, the file) are computed from it. */
   to: string;
+  /** Show the frames `ultrawatch frames` kept, beside the transcript. Off by default. */
+  frames?: boolean;
+  /** Start with "follow playback" on: the transcript scrolls with the video. Off by default. */
+  follow?: boolean;
   /** The page's language (its labels): else the run's --lang, else the video's. */
   lang?: string;
 }
@@ -243,13 +298,14 @@ export function runHtml(runDir: string, opts: HtmlOptions): { html: string } | {
   const meta = run.meta as typeof run.meta & { file?: unknown; via?: string };
   const segments: VideoSegment[] = run.segments;
   const pageDir = dirname(opts.to);
-  const frames = readFrames(runDir);
+  // Frames only on request: on a talking-head video they add nothing but weight.
+  const frames = opts.frames ? readFrames(runDir) : [];
   const chapters = [...(meta.chapters ?? [])].sort((a, b) => a.start - b.start);
   const lang = (opts.lang ?? (meta as { lang?: string }).lang ?? meta.language ?? "en").toLowerCase().split(/[-_]/)[0]!;
   const L: Labels = lang === "fr" ? LABELS.fr : LABELS.en;
   const p = player(meta, pageDir, L);
   // The page's header already carries the title: a summary's leading `# Title` would repeat it.
-  const summary = opts.summary ? markdownToHtml(opts.summary.replace(/^\s*#\s[^\n]*\n/, "")) : undefined;
+  const summary = opts.summary ? summaryToHtml(opts.summary.replace(/^\s*#\s[^\n]*\n/, ""), L) : undefined;
 
   const overview = overviewHtml({ duration: meta.duration ?? Math.max(0, ...segments.map((s) => s.end)), segments, chapters, summary: opts.summary }, L);
 
@@ -310,7 +366,7 @@ export function runHtml(runDir: string, opts: HtmlOptions): { html: string } | {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="ultrawatch">
 <title>${esc(meta.title)}</title>
-<style>${CSS}${OVERVIEW_CSS}</style>
+<style>${CSS}${PLAYER_CSS}${OVERVIEW_CSS}</style>
 </head>
 <body data-duration="${meta.duration ?? ""}" data-player="${p.kind}" data-page="${esc(meta.webpageUrl)}" data-passage="${L.passage}" data-passages="${L.passages}">
 <header class="top">
@@ -324,13 +380,14 @@ export function runHtml(runDir: string, opts: HtmlOptions): { html: string } | {
   </aside>
   <main>
     ${overview}
-    ${summary ? `<section class="summary"><h2 class="kicker">${L.summary}</h2>${summary.html}</section>` : ""}
+    ${summary ? `<section class="summary"><div class="sbar"><h2 class="kicker">${L.summary}</h2>${summary.html.includes('class="points"') ? `<button type="button" id="unfold" data-open="${esc(L.expandAll)}" data-close="${esc(L.collapseAll)}">${esc(L.expandAll)}</button>` : ""}</div>${summary.html}</section>` : ""}
     <section class="transcript">
-      <div class="tbar"><h2 class="kicker">${L.transcript}</h2><input id="q" type="search" placeholder="${L.search}" aria-label="${L.searchAria}"><label><input id="follow" type="checkbox" checked> ${L.follow}</label><span id="count"></span></div>
+      <div class="tbar"><h2 class="kicker">${L.transcript}</h2><input id="q" type="search" placeholder="${L.search}" aria-label="${L.searchAria}"><label><input id="follow" type="checkbox"${opts.follow ? " checked" : ""}> ${L.follow}</label><span id="count"></span></div>
       ${body.join("\n")}
     </section>
   </main>
 </div>
+<script>${PLAYER_SCRIPT}</script>
 <script>${SCRIPT}</script>
 <script>${OVERVIEW_SCRIPT}</script>
 </body>
@@ -340,16 +397,12 @@ export function runHtml(runDir: string, opts: HtmlOptions): { html: string } | {
 }
 
 const SCRIPT = `(() => {
-const kind = document.body.dataset.player;
-const player = document.getElementById("player");
-const page = document.body.dataset.page;
 const segs = [...document.querySelectorAll(".seg")];
 const follow = document.getElementById("follow");
+// A click seeks the player and marks the passage; it never moves the page.
 function go(t) {
-  if (kind === "video") { player.currentTime = t; player.play().catch(() => {}); }
-  else if (kind === "youtube") { player.src = "https://www.youtube-nocookie.com/embed/" + player.dataset.yt + "?start=" + t + "&autoplay=1"; }
-  else { const u = new URL(page); u.searchParams.set("t", t + "s"); window.open(u, "_blank", "noopener"); }
-  mark(t, true);
+  window.uwPlayer.seek(t);
+  mark(t, false);
 }
 document.addEventListener("click", (e) => {
   const b = e.target.closest(".stamp, .stamp-like");
@@ -364,7 +417,17 @@ function mark(t, scroll) {
   current = s;
   if (scroll && follow.checked && !document.getElementById("q").value) s.scrollIntoView({ block: "center", behavior: "smooth" });
 }
-if (kind === "video") player.addEventListener("timeupdate", () => mark(player.currentTime, true));
+// Only "follow playback", off unless the reader ticks it (or --follow), scrolls with the video.
+document.addEventListener("uw:time", (e) => mark(e.detail, follow.checked));
+// Ticking it brings the passage being played into view at once, not at the next one.
+follow.addEventListener("change", () => { if (follow.checked && current) { current.classList.remove("now"); current = undefined; mark(window.uwPlayer.time(), true); } });
+const unfold = document.getElementById("unfold");
+unfold?.addEventListener("click", () => {
+  const all = [...document.querySelectorAll(".summary details.points")];
+  const open = !all.every((d) => d.open);
+  all.forEach((d) => (d.open = open));
+  unfold.textContent = open ? unfold.dataset.close : unfold.dataset.open;
+});
 const q = document.getElementById("q");
 const count = document.getElementById("count");
 const fold = (s) => s.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
@@ -408,6 +471,14 @@ main{min-width:0;max-width:75ch}
 .summary h2,.summary h3,.summary h4{line-height:1.3;margin:1.6rem 0 .5rem;text-wrap:balance}
 .summary h2{font-size:1.3rem}.summary h3{font-size:1.1rem}.summary h4{font-size:1rem}
 .summary li{margin:.35rem 0}
+.sbar{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+#unfold{font:inherit;font-size:.82rem;color:var(--accent);background:none;border:1px solid var(--line);border-radius:6px;padding:.25rem .6rem;cursor:pointer}#unfold:hover{border-color:var(--accent)}
+.part{margin-top:.5rem}
+.brief{margin:.5rem 0 .4rem}
+.points{margin:0 0 .75rem}
+.points>summary{cursor:pointer;color:var(--muted);font-size:.85rem;padding:.2rem 0;list-style-position:inside}
+.points>summary:hover{color:var(--accent)}
+.points[open]>summary{margin-bottom:.25rem}
 blockquote{margin:1.25rem 0;padding:.5rem 1rem;border-left:3px solid var(--accent);background:var(--soft);border-radius:0 6px 6px 0}blockquote>:first-child{margin-top:0}blockquote>:last-child{margin-bottom:0}
 table{border-collapse:collapse;width:100%;font-size:.92rem;margin:1rem 0}th,td{border-bottom:1px solid var(--line);padding:.4rem .5rem;text-align:left;vertical-align:top}
 code{background:var(--soft);padding:.05rem .3rem;border-radius:3px;font-size:.88em}

@@ -2,7 +2,7 @@
 
 // src/cli.ts
 import { existsSync as existsSync10, readFileSync as readFileSync11, realpathSync as realpathSync2, writeFileSync } from "fs";
-import { join as join14, resolve as resolve5 } from "path";
+import { join as join15, resolve as resolve6 } from "path";
 import { pathToFileURL as pathToFileURL3 } from "url";
 
 // src/check.ts
@@ -5478,8 +5478,8 @@ function isHeaderRow(cells) {
 }
 function tableToMarkdown(table) {
   const width = table.rows.reduce((w, r) => Math.max(w, r.length), Math.max(table.headers.length, 1));
-  const esc3 = (s) => s.replace(/\|/g, "\\|");
-  const line = (cells) => `| ${Array.from({ length: width }, (_, i) => esc3(cells[i] ?? "")).join(" | ")} |`;
+  const esc4 = (s) => s.replace(/\|/g, "\\|");
+  const line = (cells) => `| ${Array.from({ length: width }, (_, i) => esc4(cells[i] ?? "")).join(" | ")} |`;
   const out = [];
   if (table.caption) out.push(`**${table.caption}**`, "");
   out.push(line(table.headers.length ? table.headers : Array.from({ length: width }, () => "")));
@@ -8667,7 +8667,6 @@ if (rate) {
   svg.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); tip.hidden = true; });
   svg.addEventListener("click", (e) => { const b = document.createElement("button"); b.className = "stamp"; b.dataset.t = Math.floor(at(e) * bin); b.hidden = true; document.body.append(b); b.click(); b.remove(); });
 }
-const player = document.getElementById("player");
 const strip = document.querySelector(".strip"), head = strip?.querySelector(".playhead"), total = Number(document.body.dataset.duration);
 const parts = [...document.querySelectorAll(".seg-part[data-t]")], rows = [...document.querySelectorAll(".bar-row")];
 function follow(t) {
@@ -8676,8 +8675,125 @@ function follow(t) {
   let k = -1; parts.forEach((p, i) => { if (Number(p.dataset.t) <= t + 0.5) k = i; });
   parts.forEach((p, i) => p.classList.toggle("on", i === k)); rows.forEach((r, i) => r.classList.toggle("on", i === k));
 }
-if (player && player.tagName === "VIDEO") player.addEventListener("timeupdate", () => follow(player.currentTime));
-document.addEventListener("click", (e) => { const b = e.target.closest(".stamp, .stamp-like"); if (b && b.dataset.t) follow(Number(b.dataset.t)); }, true);
+document.addEventListener("uw:time", (e) => follow(e.detail));
+})();`;
+
+// src/player.ts
+var esc2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+var SPEEDS = [1, 1.25, 1.5, 2, 2.5, 3];
+var YOUTUBE_MAX_SPEED = 2;
+function playerHtml(o, L) {
+  const { file, youtubeId: yt } = o;
+  if (!file && !yt) return { kind: "link", html: `<p><a id="player" href="${esc2(o.pageUrl)}" target="_blank" rel="noopener">${esc2(L.open)}</a></p>` };
+  const kind = file ? "video" : "youtube";
+  const speed = (r) => `${String(r).replace(".", L.decimal)}\xD7`;
+  const sources = file && yt ? `<div class="seg-ctl" role="group" aria-label="${esc2(L.sourceGroup)}"><button type="button" data-src="file" aria-pressed="true">${esc2(L.local)}</button><button type="button" data-src="youtube" aria-pressed="false">${esc2(L.youtube)}</button></div>` : "";
+  const speeds = `<div class="seg-ctl speed" role="group" aria-label="${esc2(L.speed)}"><span>${esc2(L.speed)}</span>${SPEEDS.map(
+    (r) => `<button type="button" data-rate="${r}" aria-pressed="${r === 1}"${r > YOUTUBE_MAX_SPEED ? ` data-title="${esc2(L.ytMax)}"` : ""}>${speed(r)}</button>`
+  ).join("")}</div>`;
+  const html = `<div class="uwp" data-kind="${kind}"${yt ? ` data-yt="${yt}"` : ""} data-page="${esc2(o.pageUrl)}">
+<div class="screen">${file ? `<video id="video" controls preload="metadata" src="${esc2(file)}"></video>` : ""}${yt ? `<div class="frame" id="ytbox"${file ? " hidden" : ""}></div><p class="ytnote" hidden>${L.ytFromDisk} <a href="${esc2(o.pageUrl)}" target="_blank" rel="noopener">${esc2(L.onSite)}</a></p>` : ""}</div>
+<div class="pbar">${sources}${speeds}</div>
+</div>`;
+  return { kind, html };
+}
+var PLAYER_CSS = `
+.uwp .screen{position:relative}
+.uwp [hidden]{display:none!important}
+.uwp video,.uwp .frame{width:100%;border-radius:8px;background:#000;display:block}
+.uwp .frame{aspect-ratio:16/9}.uwp .frame iframe{width:100%;height:100%;border:0;border-radius:8px;display:block}
+.ytnote{aspect-ratio:16/9;margin:0;display:flex;flex-direction:column;justify-content:center;gap:.5rem;padding:1.5rem;border-radius:8px;background:var(--soft);font-size:.9rem;line-height:1.5}
+.ytnote[hidden]{display:none}
+.ytnote code{font-size:.85em}
+.pbar{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;justify-content:space-between;margin-top:.5rem}
+.seg-ctl{display:inline-flex;align-items:center;gap:2px;font-size:.8rem}
+.seg-ctl span{color:var(--muted);margin-right:.35rem}
+.seg-ctl button{font:inherit;font-variant-numeric:tabular-nums;color:var(--fg);background:var(--soft);border:1px solid var(--line);padding:.22rem .5rem;cursor:pointer}
+.seg-ctl button:first-of-type{border-radius:6px 0 0 6px}.seg-ctl button:last-of-type{border-radius:0 6px 6px 0}
+.seg-ctl button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.seg-ctl button:disabled{opacity:.4;cursor:not-allowed}
+.seg-ctl button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+`;
+var PLAYER_SCRIPT = `(() => {
+const box = document.querySelector(".uwp");
+const link = document.getElementById("player");
+const pageUrl = box ? box.dataset.page : link ? link.href : "";
+const at = (t) => { try { const u = new URL(pageUrl); u.searchParams.set("t", Math.floor(t) + "s"); return u.toString(); } catch { return pageUrl; } };
+const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+const emit = (t) => document.dispatchEvent(new CustomEvent("uw:time", { detail: t }));
+if (!box) { window.uwPlayer = { seek: (t) => window.open(at(t), "_blank", "noopener"), time: () => 0 }; return; }
+const video = document.getElementById("video");
+const ytBox = document.getElementById("ytbox");
+const note = box.querySelector(".ytnote");
+const yt = box.dataset.yt;
+const fromDisk = location.protocol === "file:";
+const rates = [...box.querySelectorAll("[data-rate]")];
+const srcs = [...box.querySelectorAll("[data-src]")];
+let mode = video ? (yt && store.get("uw:src") === "youtube" ? "youtube" : "file") : "youtube";
+let rate = Number(store.get("uw:rate")) || 1;
+let iframe, ready = false, ytTime = 0, pending = null;
+const send = (func, args = []) => iframe && iframe.contentWindow && iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func, args, id: 1, channel: "widget" }), "*");
+function mount(start) {
+  if (fromDisk) { ytBox.hidden = true; note.hidden = false; return; }
+  note.hidden = true; ytBox.hidden = false;
+  if (iframe) return;
+  iframe = document.createElement("iframe");
+  iframe.title = "YouTube";
+  iframe.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
+  iframe.src = "https://www.youtube-nocookie.com/embed/" + yt + "?enablejsapi=1&playsinline=1&rel=0&origin=" + encodeURIComponent(location.origin) + (start ? "&start=" + Math.floor(start) : "");
+  iframe.addEventListener("load", () => iframe.contentWindow.postMessage(JSON.stringify({ event: "listening", id: 1, channel: "widget" }), "*"));
+  ytBox.append(iframe);
+}
+window.addEventListener("message", (e) => {
+  if (!iframe || e.source !== iframe.contentWindow) return;
+  let d; try { d = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch { return; }
+  if (!d) return;
+  if (!ready && (d.event === "onReady" || d.event === "initialDelivery")) {
+    ready = true;
+    send("setPlaybackRate", [Math.min(rate, ${YOUTUBE_MAX_SPEED})]);
+    if (pending !== null) { send("seekTo", [pending, true]); send("playVideo"); pending = null; }
+  }
+  if (d.info && typeof d.info.currentTime === "number") { ytTime = d.info.currentTime; if (mode === "youtube") emit(ytTime); }
+});
+if (video) video.addEventListener("timeupdate", () => { if (mode === "file") emit(video.currentTime); });
+function paint() {
+  srcs.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.src === mode)));
+  rates.forEach((b) => {
+    const r = Number(b.dataset.rate), off = mode === "youtube" && r > ${YOUTUBE_MAX_SPEED};
+    b.disabled = off; b.title = off ? b.dataset.title || "" : "";
+    b.setAttribute("aria-pressed", String(r === (mode === "youtube" ? Math.min(rate, ${YOUTUBE_MAX_SPEED}) : rate)));
+  });
+}
+function setRate(r) {
+  rate = r; store.set("uw:rate", String(r));
+  if (video) video.playbackRate = r;
+  if (ready) send("setPlaybackRate", [Math.min(r, ${YOUTUBE_MAX_SPEED})]);
+  paint();
+}
+function setMode(m) {
+  if (m === mode) return;
+  const t = time();
+  mode = m; store.set("uw:src", m);
+  if (m === "youtube") { if (video) { video.pause(); video.hidden = true; } pending = t; mount(t); if (ready) { send("seekTo", [t, true]); pending = null; } }
+  else { send("pauseVideo"); ytBox.hidden = true; note.hidden = true; video.hidden = false; video.currentTime = t; }
+  paint();
+}
+function time() { return mode === "youtube" ? ytTime : video ? video.currentTime : 0; }
+function seek(t) {
+  if (mode === "file") { video.currentTime = t; video.play().catch(() => {}); }
+  else if (fromDisk) { window.open(at(t), "_blank", "noopener"); }
+  else if (ready) { send("seekTo", [t, true]); send("playVideo"); }
+  else { pending = t; mount(t); }
+  emit(t);
+}
+box.addEventListener("click", (e) => {
+  const r = e.target.closest("[data-rate]"); if (r && !r.disabled) setRate(Number(r.dataset.rate));
+  const s = e.target.closest("[data-src]"); if (s) setMode(s.dataset.src);
+});
+if (video) { video.playbackRate = rate; video.addEventListener("ratechange", () => { if (video.playbackRate !== rate) { rate = video.playbackRate; store.set("uw:rate", String(rate)); paint(); } }); }
+if (mode === "youtube") { if (video) video.hidden = true; mount(0); }
+paint();
+window.uwPlayer = { seek, time };
 })();`;
 
 // src/html.ts
@@ -8715,7 +8831,19 @@ var LABELS = {
     start: "Start",
     length: "Length",
     min: "min",
-    locale: "en-US"
+    locale: "en-US",
+    details: "Details",
+    point: "point",
+    points: "points",
+    expandAll: "Expand all",
+    collapseAll: "Collapse all",
+    local: "Local file",
+    youtube: "YouTube",
+    speed: "Speed",
+    sourceGroup: "Video source",
+    ytFromDisk: "YouTube does not play in a page opened from disk (its error 153). Run <code>ultrawatch serve</code> in this folder and open the page from the address it prints, or:",
+    ytMax: "YouTube stops at 2\xD7: use the local file",
+    decimal: "."
   },
   fr: {
     summary: "R\xE9sum\xE9",
@@ -8750,19 +8878,31 @@ var LABELS = {
     start: "D\xE9but",
     length: "Dur\xE9e",
     min: "min",
-    locale: "fr-FR"
+    locale: "fr-FR",
+    details: "D\xE9tails",
+    point: "point",
+    points: "points",
+    expandAll: "Tout d\xE9plier",
+    collapseAll: "Tout replier",
+    local: "Fichier local",
+    youtube: "YouTube",
+    speed: "Vitesse",
+    sourceGroup: "Source de la vid\xE9o",
+    ytFromDisk: "YouTube refuse de jouer dans une page ouverte depuis le disque (son erreur 153). Lancez <code>ultrawatch serve</code> dans ce dossier et ouvrez la page \xE0 l'adresse affich\xE9e, ou :",
+    ytMax: "YouTube s'arr\xEAte \xE0 2\xD7 : passez au fichier local",
+    decimal: ","
   }
 };
-var esc2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-var seek = (t, label) => `<button type="button" class="stamp" data-t="${Math.floor(t)}">${esc2(label)}</button>`;
+var esc3 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+var seek = (t, label) => `<button type="button" class="stamp" data-t="${Math.floor(t)}">${esc3(label)}</button>`;
 function inline(raw) {
   const codes = [];
-  let s = esc2(raw).replace(/`([^`]+)`/g, (_, c) => `\uE000${codes.push(c) - 1}\uE000`);
+  let s = esc3(raw).replace(/`([^`]+)`/g, (_, c) => `\uE000${codes.push(c) - 1}\uE000`);
   s = s.replace(/(\s?)\[((?:V\d+|M)\b[^\]]*)\](?:\((https?:[^)\s]+)\))?/g, (_, space, body) => {
     let video = "";
     const parts = body.split(/[;,]/).map((part) => {
       const m = /^\s*(?:(V\d+)\s+)?(M|\d{1,2}(?::\d{2}){1,2})\s*$/.exec(part);
-      if (!m) return esc2(part.trim());
+      if (!m) return esc3(part.trim());
       video = m[1] ?? video;
       if (m[2] === "M") return "";
       const t = stampSeconds2(m[2]);
@@ -8775,9 +8915,8 @@ function inline(raw) {
   s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>').replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/(^|[^*\w])\*([^*\s][^*]*)\*/g, "$1<em>$2</em>").replace(/(^|\W)_([^_\s][^_]*)_(?=\W|$)/g, "$1<em>$2</em>");
   return s.replace(/\uE000(\d+)\uE000/g, (_, i) => `<code>${codes[Number(i)]}</code>`);
 }
-function markdownToHtml(md) {
+function markdownToHtml(md, toc = []) {
   const out = [];
-  const toc = [];
   const lines = md.replace(/\r\n?/g, "\n").split("\n");
   let para = [];
   let list;
@@ -8787,7 +8926,7 @@ function markdownToHtml(md) {
     para = [];
     if (list) out.push(`<${list.tag}>${list.items.map((i) => `<li>${inline(i)}</li>`).join("")}</${list.tag}>`);
     list = void 0;
-    if (quote.length) out.push(`<blockquote>${markdownToHtml(quote.join("\n")).html}</blockquote>`);
+    if (quote.length) out.push(`<blockquote>${markdownToHtml(quote.join("\n"), []).html}</blockquote>`);
     quote = [];
   };
   for (let i = 0; i < lines.length; i++) {
@@ -8831,6 +8970,34 @@ function markdownToHtml(md) {
   flush();
   return { html: out.join("\n"), toc };
 }
+function summaryToHtml(md, L) {
+  const toc = [];
+  const chunks = [[]];
+  for (const line of md.replace(/\r\n?/g, "\n").split("\n")) {
+    if (/^##\s/.test(line)) chunks.push([]);
+    chunks[chunks.length - 1].push(line);
+  }
+  const out = [markdownToHtml(chunks[0].join("\n"), toc).html];
+  for (const chunk of chunks.slice(1)) {
+    const [heading, ...body] = chunk;
+    let i = 0;
+    while (i < body.length && !body[i].trim()) i++;
+    let j = i;
+    while (j < body.length && /^\s*>/.test(body[j])) j++;
+    const rest = body.slice(j).join("\n").trim();
+    const head = markdownToHtml(heading, toc).html;
+    if (j === i || !rest) {
+      out.push(`<section class="part">${head}${markdownToHtml(body.join("\n"), toc).html}</section>`);
+      continue;
+    }
+    const brief = markdownToHtml(body.slice(i, j).join("\n"), toc).html.replace("<blockquote>", '<blockquote class="brief">');
+    const n = rest.split("\n").filter((l) => /^\s*(?:[-*+]|\d+[.)])\s+/.test(l)).length || rest.split(/\n\s*\n/).length;
+    out.push(
+      `<section class="part">${head}${brief}<details class="points"><summary>${esc3(L.details)} \xB7 ${n} ${esc3(n === 1 ? L.point : L.points)}</summary>${markdownToHtml(rest, toc).html}</details></section>`
+    );
+  }
+  return { html: out.join("\n"), toc };
+}
 function readFrames(runDir) {
   try {
     const raw = JSON.parse(readFileSync9(join12(runDir, "frames.json"), "utf8"));
@@ -8846,18 +9013,8 @@ function href(target, pageDir) {
 }
 function player(meta, pageDir, L) {
   const file = typeof meta.file === "string" && existsSync8(meta.file) ? meta.file : void 0;
-  const yt = /[?&]v=([A-Za-z0-9_-]{11})/.exec(meta.webpageUrl)?.[1];
-  if (file)
-    return {
-      kind: "video",
-      html: `<video id="player" controls preload="metadata" src="${esc2(href(file, pageDir))}"></video>${yt ? `<p class="fallback">${L.noPlay} <a href="${esc2(meta.webpageUrl)}" target="_blank" rel="noopener">${L.onSite}</a></p>` : ""}`
-    };
-  if (yt)
-    return {
-      kind: "youtube",
-      html: `<div class="frame"><iframe id="player" data-yt="${yt}" src="https://www.youtube-nocookie.com/embed/${yt}" title="YouTube" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`
-    };
-  return { kind: "link", html: `<p><a id="player" href="${esc2(meta.webpageUrl)}" target="_blank" rel="noopener">${L.open}</a></p>` };
+  const youtubeId = /[?&]v=([A-Za-z0-9_-]{11})/.exec(meta.webpageUrl)?.[1];
+  return playerHtml({ file: file && href(file, pageDir), youtubeId, pageUrl: meta.webpageUrl }, L);
 }
 function runHtml(runDir, opts) {
   const run2 = readVideoRun(runDir);
@@ -8865,12 +9022,12 @@ function runHtml(runDir, opts) {
   const meta = run2.meta;
   const segments = run2.segments;
   const pageDir = dirname(opts.to);
-  const frames = readFrames(runDir);
+  const frames = opts.frames ? readFrames(runDir) : [];
   const chapters = [...meta.chapters ?? []].sort((a, b) => a.start - b.start);
   const lang = (opts.lang ?? meta.lang ?? meta.language ?? "en").toLowerCase().split(/[-_]/)[0];
   const L = lang === "fr" ? LABELS.fr : LABELS.en;
   const p = player(meta, pageDir, L);
-  const summary = opts.summary ? markdownToHtml(opts.summary.replace(/^\s*#\s[^\n]*\n/, "")) : void 0;
+  const summary = opts.summary ? summaryToHtml(opts.summary.replace(/^\s*#\s[^\n]*\n/, ""), L) : void 0;
   const overview = overviewHtml({ duration: meta.duration ?? Math.max(0, ...segments.map((s) => s.end)), segments, chapters, summary: opts.summary }, L);
   const facts = [
     meta.channel,
@@ -8884,39 +9041,39 @@ function runHtml(runDir, opts) {
   for (const s of segments) {
     while (c + 1 < chapters.length && chapters[c + 1].start <= s.start + 0.5) {
       c++;
-      body.push(`<h3 class="chapter" id="c${c}">${seek(chapters[c].start, formatStamp(chapters[c].start))} ${esc2(chapters[c].title)}</h3>`);
+      body.push(`<h3 class="chapter" id="c${c}">${seek(chapters[c].start, formatStamp(chapters[c].start))} ${esc3(chapters[c].title)}</h3>`);
     }
     const shots = [];
     while (f < frames.length && frames[f].time < s.end + 0.5) {
       const fr = frames[f++];
       shots.push(
-        `<figure>${seek(fr.time, fr.stamp)}<img loading="lazy" src="${esc2(href(join12(runDir, fr.file), pageDir))}" alt="${L.at} ${fr.stamp}"></figure>`
+        `<figure>${seek(fr.time, fr.stamp)}<img loading="lazy" src="${esc3(href(join12(runDir, fr.file), pageDir))}" alt="${L.at} ${fr.stamp}"></figure>`
       );
     }
     body.push(
-      `<p class="seg" data-start="${s.start}" data-end="${s.end}">${seek(s.start, formatStamp(s.start))} <span>${esc2(s.text)}</span></p>${shots.length ? `<div class="shots">${shots.join("")}</div>` : ""}`
+      `<p class="seg" data-start="${s.start}" data-end="${s.end}">${seek(s.start, formatStamp(s.start))} <span>${esc3(s.text)}</span></p>${shots.length ? `<div class="shots">${shots.join("")}</div>` : ""}`
     );
   }
   const nav = [
-    summary?.toc.length ? `<h2>${L.summary}</h2><ol class="toc">${summary.toc.filter((t) => t.level <= 2).map((t) => `<li><a href="#${t.id}">${esc2(t.title)}</a></li>`).join("")}</ol>` : "",
-    chapters.length ? `<h2>${L.chapters}</h2><ol class="toc">${chapters.map((ch, i) => `<li>${seek(ch.start, formatStamp(ch.start))} <a href="#c${i}">${esc2(ch.title)}</a></li>`).join("")}</ol>` : "",
+    summary?.toc.length ? `<h2>${L.summary}</h2><ol class="toc">${summary.toc.filter((t) => t.level <= 2).map((t) => `<li><a href="#${t.id}">${esc3(t.title)}</a></li>`).join("")}</ol>` : "",
+    chapters.length ? `<h2>${L.chapters}</h2><ol class="toc">${chapters.map((ch, i) => `<li>${seek(ch.start, formatStamp(ch.start))} <a href="#c${i}">${esc3(ch.title)}</a></li>`).join("")}</ol>` : "",
     frames.length ? `<h2>${L.frames} (${frames.length})</h2><div class="thumbs">${frames.map(
-      (fr) => `<button type="button" class="stamp thumb" data-t="${Math.floor(fr.time)}" title="${fr.stamp}"><img loading="lazy" src="${esc2(href(join12(runDir, fr.file), pageDir))}" alt="${fr.stamp}"></button>`
+      (fr) => `<button type="button" class="stamp thumb" data-t="${Math.floor(fr.time)}" title="${fr.stamp}"><img loading="lazy" src="${esc3(href(join12(runDir, fr.file), pageDir))}" alt="${fr.stamp}"></button>`
     ).join("")}</div>` : ""
   ].join("");
   const html = `<!DOCTYPE html>
-<html lang="${esc2(lang)}">
+<html lang="${esc3(lang)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="ultrawatch">
-<title>${esc2(meta.title)}</title>
-<style>${CSS}${OVERVIEW_CSS}</style>
+<title>${esc3(meta.title)}</title>
+<style>${CSS}${PLAYER_CSS}${OVERVIEW_CSS}</style>
 </head>
-<body data-duration="${meta.duration ?? ""}" data-player="${p.kind}" data-page="${esc2(meta.webpageUrl)}" data-passage="${L.passage}" data-passages="${L.passages}">
+<body data-duration="${meta.duration ?? ""}" data-player="${p.kind}" data-page="${esc3(meta.webpageUrl)}" data-passage="${L.passage}" data-passages="${L.passages}">
 <header class="top">
-  <h1>${esc2(meta.title)}</h1>
-  <p class="facts">${facts.map((x) => esc2(String(x))).join(" \xB7 ")} \xB7 <a href="${esc2(meta.webpageUrl)}" target="_blank" rel="noopener">${L.source}</a></p>
+  <h1>${esc3(meta.title)}</h1>
+  <p class="facts">${facts.map((x) => esc3(String(x))).join(" \xB7 ")} \xB7 <a href="${esc3(meta.webpageUrl)}" target="_blank" rel="noopener">${L.source}</a></p>
 </header>
 <div class="layout">
   <aside class="side">
@@ -8925,13 +9082,14 @@ function runHtml(runDir, opts) {
   </aside>
   <main>
     ${overview}
-    ${summary ? `<section class="summary"><h2 class="kicker">${L.summary}</h2>${summary.html}</section>` : ""}
+    ${summary ? `<section class="summary"><div class="sbar"><h2 class="kicker">${L.summary}</h2>${summary.html.includes('class="points"') ? `<button type="button" id="unfold" data-open="${esc3(L.expandAll)}" data-close="${esc3(L.collapseAll)}">${esc3(L.expandAll)}</button>` : ""}</div>${summary.html}</section>` : ""}
     <section class="transcript">
-      <div class="tbar"><h2 class="kicker">${L.transcript}</h2><input id="q" type="search" placeholder="${L.search}" aria-label="${L.searchAria}"><label><input id="follow" type="checkbox" checked> ${L.follow}</label><span id="count"></span></div>
+      <div class="tbar"><h2 class="kicker">${L.transcript}</h2><input id="q" type="search" placeholder="${L.search}" aria-label="${L.searchAria}"><label><input id="follow" type="checkbox"${opts.follow ? " checked" : ""}> ${L.follow}</label><span id="count"></span></div>
       ${body.join("\n")}
     </section>
   </main>
 </div>
+<script>${PLAYER_SCRIPT}</script>
 <script>${SCRIPT}</script>
 <script>${OVERVIEW_SCRIPT}</script>
 </body>
@@ -8940,16 +9098,12 @@ function runHtml(runDir, opts) {
   return { html };
 }
 var SCRIPT = `(() => {
-const kind = document.body.dataset.player;
-const player = document.getElementById("player");
-const page = document.body.dataset.page;
 const segs = [...document.querySelectorAll(".seg")];
 const follow = document.getElementById("follow");
+// A click seeks the player and marks the passage; it never moves the page.
 function go(t) {
-  if (kind === "video") { player.currentTime = t; player.play().catch(() => {}); }
-  else if (kind === "youtube") { player.src = "https://www.youtube-nocookie.com/embed/" + player.dataset.yt + "?start=" + t + "&autoplay=1"; }
-  else { const u = new URL(page); u.searchParams.set("t", t + "s"); window.open(u, "_blank", "noopener"); }
-  mark(t, true);
+  window.uwPlayer.seek(t);
+  mark(t, false);
 }
 document.addEventListener("click", (e) => {
   const b = e.target.closest(".stamp, .stamp-like");
@@ -8964,7 +9118,17 @@ function mark(t, scroll) {
   current = s;
   if (scroll && follow.checked && !document.getElementById("q").value) s.scrollIntoView({ block: "center", behavior: "smooth" });
 }
-if (kind === "video") player.addEventListener("timeupdate", () => mark(player.currentTime, true));
+// Only "follow playback", off unless the reader ticks it (or --follow), scrolls with the video.
+document.addEventListener("uw:time", (e) => mark(e.detail, follow.checked));
+// Ticking it brings the passage being played into view at once, not at the next one.
+follow.addEventListener("change", () => { if (follow.checked && current) { current.classList.remove("now"); current = undefined; mark(window.uwPlayer.time(), true); } });
+const unfold = document.getElementById("unfold");
+unfold?.addEventListener("click", () => {
+  const all = [...document.querySelectorAll(".summary details.points")];
+  const open = !all.every((d) => d.open);
+  all.forEach((d) => (d.open = open));
+  unfold.textContent = open ? unfold.dataset.close : unfold.dataset.open;
+});
 const q = document.getElementById("q");
 const count = document.getElementById("count");
 const fold = (s) => s.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
@@ -9007,6 +9171,14 @@ main{min-width:0;max-width:75ch}
 .summary h2,.summary h3,.summary h4{line-height:1.3;margin:1.6rem 0 .5rem;text-wrap:balance}
 .summary h2{font-size:1.3rem}.summary h3{font-size:1.1rem}.summary h4{font-size:1rem}
 .summary li{margin:.35rem 0}
+.sbar{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+#unfold{font:inherit;font-size:.82rem;color:var(--accent);background:none;border:1px solid var(--line);border-radius:6px;padding:.25rem .6rem;cursor:pointer}#unfold:hover{border-color:var(--accent)}
+.part{margin-top:.5rem}
+.brief{margin:.5rem 0 .4rem}
+.points{margin:0 0 .75rem}
+.points>summary{cursor:pointer;color:var(--muted);font-size:.85rem;padding:.2rem 0;list-style-position:inside}
+.points>summary:hover{color:var(--accent)}
+.points[open]>summary{margin-bottom:.25rem}
 blockquote{margin:1.25rem 0;padding:.5rem 1rem;border-left:3px solid var(--accent);background:var(--soft);border-radius:0 6px 6px 0}blockquote>:first-child{margin-top:0}blockquote>:last-child{margin-bottom:0}
 table{border-collapse:collapse;width:100%;font-size:.92rem;margin:1rem 0}th,td{border-bottom:1px solid var(--line);padding:.4rem .5rem;text-align:left;vertical-align:top}
 code{background:var(--soft);padding:.05rem .3rem;border-radius:3px;font-size:.88em}
@@ -9029,26 +9201,137 @@ hr{border:0;border-top:1px solid var(--line);margin:1.5rem 0}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 `;
 
+// src/serve.ts
+import { createReadStream, readdirSync as readdirSync6, statSync as statSync6 } from "fs";
+import { createServer } from "http";
+import { extname, join as join13, relative as relative2, resolve as resolve4, sep as sep3 } from "path";
+var TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".md": "text/markdown; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webm": "video/webm",
+  ".mp4": "video/mp4",
+  ".m4v": "video/mp4",
+  ".mov": "video/quicktime",
+  ".mkv": "video/x-matroska",
+  ".vtt": "text/vtt; charset=utf-8"
+};
+function servedPath(root, urlPath) {
+  let path;
+  try {
+    path = decodeURIComponent(urlPath.split("?")[0].split("#")[0]);
+  } catch {
+    return void 0;
+  }
+  if (path.includes("\0")) return void 0;
+  const target = resolve4(root, `.${path.startsWith("/") ? path : `/${path}`}`);
+  const rel = relative2(root, target);
+  return rel.startsWith("..") || rel.split(sep3).includes("..") ? void 0 : target;
+}
+function serve(dir, port = 0) {
+  const root = resolve4(dir);
+  const server = createServer((req, res) => {
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      res.writeHead(405, { Allow: "GET, HEAD" }).end();
+      return;
+    }
+    let path = servedPath(root, req.url ?? "/");
+    let st;
+    try {
+      if (path) st = statSync6(path);
+      if (path && st?.isDirectory()) {
+        const index = join13(path, "index.html");
+        st = statSync6(index);
+        path = index;
+      }
+    } catch {
+      st = void 0;
+    }
+    if (!path || !st?.isFile()) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("not found");
+      return;
+    }
+    const type = TYPES[extname(path).toLowerCase()] ?? "application/octet-stream";
+    const size = st.size;
+    const head = { "Content-Type": type, "Accept-Ranges": "bytes", "Cache-Control": "no-cache" };
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? "");
+    if (range && (range[1] || range[2])) {
+      let start = range[1] ? Number(range[1]) : Math.max(0, size - Number(range[2]));
+      let end = range[1] && range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
+      if (!range[1]) end = size - 1;
+      if (start > end || start >= size) {
+        res.writeHead(416, { "Content-Range": `bytes */${size}` }).end();
+        return;
+      }
+      start = Math.max(0, start);
+      end = Math.min(end, size - 1);
+      res.writeHead(206, { ...head, "Content-Range": `bytes ${start}-${end}/${size}`, "Content-Length": end - start + 1 });
+      if (req.method === "HEAD") res.end();
+      else createReadStream(path, { start, end }).pipe(res);
+      return;
+    }
+    res.writeHead(200, { ...head, "Content-Length": size });
+    if (req.method === "HEAD") res.end();
+    else createReadStream(path).pipe(res);
+  });
+  return new Promise((done, fail2) => {
+    server.once("error", fail2);
+    server.listen(port, "127.0.0.1", () => {
+      const addr = server.address();
+      const p = typeof addr === "object" && addr ? addr.port : port;
+      done({ server, url: `http://127.0.0.1:${p}/` });
+    });
+  });
+}
+function pagesIn(dir) {
+  const root = resolve4(dir);
+  const out = [];
+  const scan = (d, depth) => {
+    let names;
+    try {
+      names = readdirSync6(d);
+    } catch {
+      return;
+    }
+    for (const n of names.sort()) {
+      if (n.startsWith(".")) continue;
+      const p = join13(d, n);
+      if (n.endsWith(".html")) out.push(relative2(root, p).split(sep3).map(encodeURIComponent).join("/"));
+      else if (depth < 1) {
+        try {
+          if (statSync6(p).isDirectory()) scan(p, depth + 1);
+        } catch {
+        }
+      }
+    }
+  };
+  scan(root, 0);
+  return out;
+}
+
 // src/local.ts
 import { createHash as createHash2 } from "crypto";
-import { existsSync as existsSync9, mkdtempSync, readdirSync as readdirSync6, readFileSync as readFileSync10, rmSync, statSync as statSync6, symlinkSync } from "fs";
+import { existsSync as existsSync9, mkdtempSync, readdirSync as readdirSync7, readFileSync as readFileSync10, rmSync, statSync as statSync7, symlinkSync } from "fs";
 import { tmpdir as tmpdir2 } from "os";
-import { basename as basename3, dirname as dirname2, extname, join as join13, resolve as resolve4 } from "path";
+import { basename as basename3, dirname as dirname2, extname as extname2, join as join14, resolve as resolve5 } from "path";
 import { pathToFileURL as pathToFileURL2 } from "url";
 function isLocalVideo(target) {
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target)) return false;
   try {
-    return statSync6(target).isFile();
+    return statSync7(target).isFile();
   } catch {
     return false;
   }
 }
 function localIdentity(path) {
-  const stem = basename3(path, extname(path));
+  const stem = basename3(path, extname2(path));
   const m = /^(.*?)\s*\[([A-Za-z0-9_-]{11})\]$/.exec(stem);
   if (m) return { key: m[2], title: m[1].trim() || m[2], youtubeId: m[2] };
   const slug = stem.normalize("NFKD").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase().slice(0, 80) || "video";
-  const hash = createHash2("sha256").update(resolve4(path)).digest("hex").slice(0, 8);
+  const hash = createHash2("sha256").update(resolve5(path)).digest("hex").slice(0, 8);
   return { key: `local-${slug}-${hash}`, title: stem };
 }
 async function ffprobe(path, run2) {
@@ -9066,10 +9349,10 @@ async function ffprobe(path, run2) {
   }
 }
 function sidecarVtt(path, lang) {
-  const stem = basename3(path, extname(path));
+  const stem = basename3(path, extname2(path));
   let names;
   try {
-    names = readdirSync6(dirname2(path));
+    names = readdirSync7(dirname2(path));
   } catch {
     return void 0;
   }
@@ -9078,7 +9361,7 @@ function sidecarVtt(path, lang) {
   const pick2 = want && subs.find(
     (n) => n.slice(stem.length + 1, -4).toLowerCase().split(/[-_]/)[0] === want
   ) || (want ? void 0 : subs[0]);
-  return pick2 ? join13(dirname2(path), pick2) : void 0;
+  return pick2 ? join14(dirname2(path), pick2) : void 0;
 }
 function whisperSegments2(json2) {
   try {
@@ -9097,9 +9380,9 @@ async function whisperLocal(path, duration, lang, run2) {
   const budget = Number.isFinite(fromEnv) && fromEnv >= 1e3 ? fromEnv : Math.max(30 * 6e4, (duration ?? 0) * 1e3);
   const deadline = Date.now() + budget;
   const left = () => Math.max(1e3, deadline - Date.now());
-  const dir = mkdtempSync(join13(tmpdir2(), "ultrawatch-local-"));
+  const dir = mkdtempSync(join14(tmpdir2(), "ultrawatch-local-"));
   try {
-    const wav = join13(dir, "speech.wav");
+    const wav = join14(dir, "speech.wav");
     const ff = await run2("ffmpeg", ["-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", path, "-vn", "-ar", "16000", "-ac", "1", wav], {
       timeoutMs: left()
     });
@@ -9124,7 +9407,7 @@ async function whisperLocal(path, duration, lang, run2) {
     const w = await run2("uvx", args, { timeoutMs: left(), cwd: dir });
     if (w.missing) return { failed: "whisper needs uvx (https://docs.astral.sh/uv/)" };
     if (w.status === 124) return { failed: `whisper timed out after ${Math.round(budget / 6e4)} min (${envName("WHISPER_TIMEOUT_MS")})` };
-    const out = join13(dir, "speech.json");
+    const out = join14(dir, "speech.json");
     if (!w.ok || !existsSync9(out)) return { failed: `whisper: ${w.stderr.trim().split("\n").pop() || "failed"}` };
     return { segments: whisperSegments2(readFileSync10(out, "utf8")) };
   } finally {
@@ -9132,11 +9415,11 @@ async function whisperLocal(path, duration, lang, run2) {
   }
 }
 async function fetchLocalRun(file, root, opts = {}) {
-  const path = resolve4(file);
+  const path = resolve5(file);
   const run2 = opts.run ?? shAsync;
   const { key, title, youtubeId } = localIdentity(path);
-  const dir = join13(root, key);
-  const transcriptPath = join13(dir, "TRANSCRIPT.md");
+  const dir = join14(root, key);
+  const transcriptPath = join14(dir, "TRANSCRIPT.md");
   if (!opts.refresh) {
     const kept = readVideoRun(dir);
     if (kept && existsSync9(transcriptPath) && (!opts.lang || kept.meta.lang === opts.lang))
@@ -9164,7 +9447,7 @@ async function fetchLocalRun(file, root, opts = {}) {
   if (vtt) {
     segments = mergeSegments(parseVtt(readFileSync10(vtt, "utf8")), starts);
     via = "manual-subs";
-    track2 = basename3(vtt).slice(basename3(path, extname(path)).length + 1, -4);
+    track2 = basename3(vtt).slice(basename3(path, extname2(path)).length + 1, -4);
   } else {
     const w = await whisperLocal(path, meta.duration, opts.lang, run2);
     if ("failed" in w) return { ok: false, id: key, reason: w.failed ?? "whisper failed" };
@@ -9187,10 +9470,10 @@ async function fetchLocalRun(file, root, opts = {}) {
   if (isNoWrite()) return { ...done, markdown };
   try {
     ensureDir(dir);
-    writeArtifact(join13(dir, "segments.json"), `${JSON.stringify(segments, null, 1)}
+    writeArtifact(join14(dir, "segments.json"), `${JSON.stringify(segments, null, 1)}
 `);
     writeArtifact(transcriptPath, markdown);
-    writeArtifact(join13(dir, "meta.json"), `${JSON.stringify(runMeta, null, 2)}
+    writeArtifact(join14(dir, "meta.json"), `${JSON.stringify(runMeta, null, 2)}
 `);
   } catch (e) {
     return { ok: false, id: key, reason: `cannot write the run in ${dir}: ${e.message}` };
@@ -9202,14 +9485,14 @@ function localFileOf(runDir) {
   return typeof file === "string" && isLocalVideo(file) ? file : void 0;
 }
 async function extractLocalFrames(runDir, file, opts = {}) {
-  const path = resolve4(file);
+  const path = resolve5(file);
   const base2 = opts.run ?? shAsync;
   const run2 = async (cmd, args, o) => {
     if (cmd === "ffmpeg" && args.some((a) => a.startsWith("select='gt(scene")) && args.includes("-i")) return base2(cmd, ["-skip_frame", "nokey", ...args], o);
     if (cmd !== "yt-dlp") return base2(cmd, args, o);
     const template = args[args.indexOf("-o") + 1];
     if (!args.includes("-o") || !template) return { ok: false, status: 1, stdout: "", stderr: "a local file is only ever downloaded" };
-    symlinkSync(path, template.replace("%(ext)s", extname(path).slice(1) || "mp4"));
+    symlinkSync(path, template.replace("%(ext)s", extname2(path).slice(1) || "mp4"));
     return { ok: true, status: 0, stdout: "", stderr: "" };
   };
   const meta = readVideoRun(runDir)?.meta;
@@ -9233,7 +9516,8 @@ USAGE
   ultrawatch frames <url|file|id|dir> [--effort low|med|high] [--out <dir>] [--lang <tag>] [--json]
   ultrawatch list <playlist|channel> [--limit <n>] [--out <dir>] [--lang <tag>] [--refresh] [--json]
   ultrawatch check <run> <answer.md> [--videos <id,id,\u2026>] [--json]
-  ultrawatch html <url|file|id|dir> [--summary <answer.md>] [--to <page.html>] [--out <dir>] [--json]
+  ultrawatch html <url|file|id|dir> [--summary <answer.md>] [--to <page.html>] [--frames] [--follow] [--out <dir>] [--json]
+  ultrawatch serve [dir] [--port <n>]
   ultrawatch doctor [--json]
   ultrawatch version
 
@@ -9268,13 +9552,22 @@ COMMANDS
            by one with --videos naming V1, V2\u2026 in order. Exits 1 with a
            line-by-line report otherwise; an answer with no claim fails too.
   html     One self-contained page to watch and understand a video: the
-           player (the local file when the run was read from disk, else the
-           site's embed); an overview \u2014 key figures, the outline as a
-           timeline with the cited moments, the length of each part, the
-           speech rate over time; --summary rendered with every [V1 mm:ss] a
-           button that seeks the player; the chapters, the frames, and the
-           whole transcript, searchable and following playback. Written to
-           --to, else <id>/index.html; nothing is fetched when it opens.
+           player \u2014 the local file when the run was read from disk, YouTube's
+           embed, or both with a switch \u2014 with speeds from 1\xD7 to 3\xD7 (YouTube
+           stops at 2\xD7); an overview \u2014 key figures, the outline as a timeline
+           with the cited moments, the length of each part, the speech rate
+           over time; --summary rendered section by section, each one's
+           "In short" shown and its points folded beneath, every [V1 mm:ss] a
+           button that seeks the player; the chapters and the whole
+           transcript, searchable, the passage being played marked. --frames
+           adds the frames 'frames' kept. Nothing scrolls on its own: --follow
+           starts with "follow playback" ticked. Written to --to, else
+           <id>/index.html. Opened from disk it fetches nothing; YouTube's
+           player needs it served ('serve').
+  serve    The pages in [dir] (default: here) over http://127.0.0.1:<port>,
+           this machine only, read-only, until Ctrl-C. Needed for the YouTube
+           player, which refuses a page opened from disk; the local file
+           plays either way.
   doctor   yt-dlp (and how old it is), ffmpeg, uvx, the whisper model, the
            transcript rungs, and where runs are kept.
 
@@ -9290,9 +9583,9 @@ ENVIRONMENT
 
 Nothing here needs an API key. yt-dlp is required; ffmpeg and uv (uvx) unlock
 frames and whisper.`;
-var VALUE_FLAGS = ["out", "lang", "limit", "effort", "videos", "summary", "to"];
-var BOOL_FLAGS = ["json", "refresh"];
-var COMMANDS = ["fetch", "search", "frames", "list", "check", "html", "doctor"];
+var VALUE_FLAGS = ["out", "lang", "limit", "effort", "videos", "summary", "to", "port"];
+var BOOL_FLAGS = ["json", "refresh", "follow", "frames"];
+var COMMANDS = ["fetch", "search", "frames", "list", "check", "html", "serve", "doctor"];
 var SPEC = { commands: COMMANDS, valueFlags: VALUE_FLAGS, boolFlags: BOOL_FLAGS };
 var YTDLP_STALE_DAYS = 60;
 function fail(msg, code = EXIT_FAILURE) {
@@ -9310,7 +9603,7 @@ function videoList(args) {
 }
 function citeLabels(root, videos) {
   if (videos) return new Map(videos.map((id, i) => [id, `V${i + 1}`]));
-  if (existsSync10(join14(root, "corpus.json"))) return void 0;
+  if (existsSync10(join15(root, "corpus.json"))) return void 0;
   const runs = listVideoRuns(root);
   return runs.length === 1 ? /* @__PURE__ */ new Map([[runs[0].meta.id, "V1"]]) : void 0;
 }
@@ -9375,7 +9668,7 @@ async function run(args) {
       const r2 = await fetchVideoRun(target, root, { lang: argValue(args, "lang") });
       if (!r2.ok) fail(`no transcript for ${target}: ${r2.reason}`);
       runDir = r2.dir;
-    } else runDir = existsSync10(join14(root, target, "meta.json")) ? join14(root, target) : resolve5(target);
+    } else runDir = existsSync10(join15(root, target, "meta.json")) ? join15(root, target) : resolve6(target);
     const localFile = localFileOf(runDir);
     const r = localFile ? await extractLocalFrames(runDir, localFile, { effort }) : await extractFrames(runDir, { effort });
     if (!r.ok) {
@@ -9425,7 +9718,7 @@ ${r.videos.map((v) => `  ${v.label.padEnd(4)}${v.dir ? `${(v.via ?? "").padEnd(1
     } catch {
       return fail(`cannot read ${file}`);
     }
-    const r = checkAnswer(resolve5(dir), answer, { videos });
+    const r = checkAnswer(resolve6(dir), answer, { videos });
     if ("error" in r) fail(r.error);
     const failing = r.problems.filter((p) => !NOTE_KINDS.has(p.kind));
     if (asJson) process.stdout.write(jsonLine({ ok: failing.length === 0, ...r }));
@@ -9443,7 +9736,7 @@ ${r.videos.map((v) => `  ${v.label.padEnd(4)}${v.dir ? `${(v.via ?? "").padEnd(1
   }
   if (cmd === "html") {
     const target = args.positional[0];
-    if (!target) usage("usage: ultrawatch html <url|file|id|dir> [--summary <answer.md>] [--to <page.html>] [--out <dir>] [--json]");
+    if (!target) usage("usage: ultrawatch html <url|file|id|dir> [--summary <answer.md>] [--to <page.html>] [--frames] [--follow] [--out <dir>] [--json]");
     let runDir;
     if (isLocalVideo(target)) {
       const r2 = await fetchLocalRun(target, root, { lang: argValue(args, "lang") });
@@ -9453,7 +9746,7 @@ ${r.videos.map((v) => `  ${v.label.padEnd(4)}${v.dir ? `${(v.via ?? "").padEnd(1
       const r2 = await fetchVideoRun(target, root, { lang: argValue(args, "lang") });
       if (!r2.ok) fail(`no transcript for ${target}: ${r2.reason}`);
       runDir = r2.dir;
-    } else runDir = existsSync10(join14(root, target, "meta.json")) ? join14(root, target) : resolve5(target);
+    } else runDir = existsSync10(join15(root, target, "meta.json")) ? join15(root, target) : resolve6(target);
     const summaryFile = argValue(args, "summary");
     let summary;
     if (summaryFile !== void 0) {
@@ -9463,8 +9756,8 @@ ${r.videos.map((v) => `  ${v.label.padEnd(4)}${v.dir ? `${(v.via ?? "").padEnd(1
         fail(`cannot read ${summaryFile}`);
       }
     }
-    const to = resolve5(argValue(args, "to") ?? join14(runDir, "index.html"));
-    const r = runHtml(runDir, { summary, to, lang: argValue(args, "lang") });
+    const to = resolve6(argValue(args, "to") ?? join15(runDir, "index.html"));
+    const r = runHtml(runDir, { summary, to, lang: argValue(args, "lang"), follow: argBool(args, "follow"), frames: argBool(args, "frames") });
     if ("error" in r) fail(r.error);
     if (isNoWrite()) {
       process.stdout.write(r.html);
@@ -9477,6 +9770,22 @@ ${r.videos.map((v) => `  ${v.label.padEnd(4)}${v.dir ? `${(v.via ?? "").padEnd(1
     }
     process.stdout.write(asJson ? jsonLine({ ok: true, dir: runDir, html: to }) : `${to}
 `);
+    return;
+  }
+  if (cmd === "serve") {
+    const dir = resolve6(args.positional[0] ?? ".");
+    const port = argInt(args, "port", { min: 0 }) ?? 8765;
+    let url;
+    try {
+      ({ url } = await serve(dir, port));
+    } catch (e) {
+      return fail(`cannot serve ${dir} on port ${port}: ${e.message} \u2014 try --port <n>`);
+    }
+    const pages = pagesIn(dir);
+    process.stdout.write(`${url}  (${dir}, Ctrl-C to stop)
+${pages.map((p) => `  ${url}${p}`).join("\n")}${pages.length ? "\n" : ""}`);
+    await new Promise(() => {
+    });
     return;
   }
   if (cmd === "doctor") {

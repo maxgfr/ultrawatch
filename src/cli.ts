@@ -35,6 +35,7 @@ import {
   ytdlpVersionAge,
 } from "./engine.js";
 import { runHtml } from "./html.js";
+import { pagesIn, serve } from "./serve.js";
 import { extractLocalFrames, fetchLocalRun, isLocalVideo, localFileOf } from "./local.js";
 import { VERSION } from "./version.js";
 
@@ -50,7 +51,8 @@ USAGE
   ultrawatch frames <url|file|id|dir> [--effort low|med|high] [--out <dir>] [--lang <tag>] [--json]
   ultrawatch list <playlist|channel> [--limit <n>] [--out <dir>] [--lang <tag>] [--refresh] [--json]
   ultrawatch check <run> <answer.md> [--videos <id,id,…>] [--json]
-  ultrawatch html <url|file|id|dir> [--summary <answer.md>] [--to <page.html>] [--out <dir>] [--json]
+  ultrawatch html <url|file|id|dir> [--summary <answer.md>] [--to <page.html>] [--frames] [--follow] [--out <dir>] [--json]
+  ultrawatch serve [dir] [--port <n>]
   ultrawatch doctor [--json]
   ultrawatch version
 
@@ -85,13 +87,22 @@ COMMANDS
            by one with --videos naming V1, V2… in order. Exits 1 with a
            line-by-line report otherwise; an answer with no claim fails too.
   html     One self-contained page to watch and understand a video: the
-           player (the local file when the run was read from disk, else the
-           site's embed); an overview — key figures, the outline as a
-           timeline with the cited moments, the length of each part, the
-           speech rate over time; --summary rendered with every [V1 mm:ss] a
-           button that seeks the player; the chapters, the frames, and the
-           whole transcript, searchable and following playback. Written to
-           --to, else <id>/index.html; nothing is fetched when it opens.
+           player — the local file when the run was read from disk, YouTube's
+           embed, or both with a switch — with speeds from 1× to 3× (YouTube
+           stops at 2×); an overview — key figures, the outline as a timeline
+           with the cited moments, the length of each part, the speech rate
+           over time; --summary rendered section by section, each one's
+           "In short" shown and its points folded beneath, every [V1 mm:ss] a
+           button that seeks the player; the chapters and the whole
+           transcript, searchable, the passage being played marked. --frames
+           adds the frames 'frames' kept. Nothing scrolls on its own: --follow
+           starts with "follow playback" ticked. Written to --to, else
+           <id>/index.html. Opened from disk it fetches nothing; YouTube's
+           player needs it served ('serve').
+  serve    The pages in [dir] (default: here) over http://127.0.0.1:<port>,
+           this machine only, read-only, until Ctrl-C. Needed for the YouTube
+           player, which refuses a page opened from disk; the local file
+           plays either way.
   doctor   yt-dlp (and how old it is), ffmpeg, uvx, the whisper model, the
            transcript rungs, and where runs are kept.
 
@@ -108,9 +119,9 @@ ENVIRONMENT
 Nothing here needs an API key. yt-dlp is required; ffmpeg and uv (uvx) unlock
 frames and whisper.`;
 
-export const VALUE_FLAGS = ["out", "lang", "limit", "effort", "videos", "summary", "to"];
-export const BOOL_FLAGS = ["json", "refresh"];
-export const COMMANDS = ["fetch", "search", "frames", "list", "check", "html", "doctor"];
+export const VALUE_FLAGS = ["out", "lang", "limit", "effort", "videos", "summary", "to", "port"];
+export const BOOL_FLAGS = ["json", "refresh", "follow", "frames"];
+export const COMMANDS = ["fetch", "search", "frames", "list", "check", "html", "serve", "doctor"];
 
 const SPEC: CliSpec = { commands: COMMANDS, valueFlags: VALUE_FLAGS, boolFlags: BOOL_FLAGS };
 const YTDLP_STALE_DAYS = 60;
@@ -274,7 +285,7 @@ async function run(args: CommandArgs): Promise<void> {
 
   if (cmd === "html") {
     const target = args.positional[0];
-    if (!target) usage("usage: ultrawatch html <url|file|id|dir> [--summary <answer.md>] [--to <page.html>] [--out <dir>] [--json]");
+    if (!target) usage("usage: ultrawatch html <url|file|id|dir> [--summary <answer.md>] [--to <page.html>] [--frames] [--follow] [--out <dir>] [--json]");
     let runDir: string;
     if (isLocalVideo(target)) {
       const r = await fetchLocalRun(target, root, { lang: argValue(args, "lang") });
@@ -295,7 +306,7 @@ async function run(args: CommandArgs): Promise<void> {
       }
     }
     const to = resolve(argValue(args, "to") ?? join(runDir, "index.html"));
-    const r = runHtml(runDir, { summary, to, lang: argValue(args, "lang") });
+    const r = runHtml(runDir, { summary, to, lang: argValue(args, "lang"), follow: argBool(args, "follow"), frames: argBool(args, "frames") });
     if ("error" in r) fail(r.error);
     if (isNoWrite()) {
       process.stdout.write(r.html);
@@ -307,6 +318,21 @@ async function run(args: CommandArgs): Promise<void> {
       fail(`cannot write ${to}: ${(e as Error).message}`);
     }
     process.stdout.write(asJson ? jsonLine({ ok: true, dir: runDir, html: to }) : `${to}\n`);
+    return;
+  }
+
+  if (cmd === "serve") {
+    const dir = resolve(args.positional[0] ?? ".");
+    const port = argInt(args, "port", { min: 0 }) ?? 8765;
+    let url: string;
+    try {
+      ({ url } = await serve(dir, port));
+    } catch (e) {
+      return fail(`cannot serve ${dir} on port ${port}: ${(e as Error).message} — try --port <n>`);
+    }
+    const pages = pagesIn(dir);
+    process.stdout.write(`${url}  (${dir}, Ctrl-C to stop)\n${pages.map((p) => `  ${url}${p}`).join("\n")}${pages.length ? "\n" : ""}`);
+    await new Promise(() => {});
     return;
   }
 

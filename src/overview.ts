@@ -274,7 +274,6 @@ if (rate) {
   svg.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); tip.hidden = true; });
   svg.addEventListener("click", (e) => { const b = document.createElement("button"); b.className = "stamp"; b.dataset.t = Math.floor(at(e) * bin); b.hidden = true; document.body.append(b); b.click(); b.remove(); });
 }
-const player = document.getElementById("player");
 const strip = document.querySelector(".strip"), head = strip?.querySelector(".playhead"), total = Number(document.body.dataset.duration);
 const parts = [...document.querySelectorAll(".seg-part[data-t]")], rows = [...document.querySelectorAll(".bar-row")];
 function follow(t) {
@@ -283,6 +282,5 @@ function follow(t) {
   let k = -1; parts.forEach((p, i) => { if (Number(p.dataset.t) <= t + 0.5) k = i; });
   parts.forEach((p, i) => p.classList.toggle("on", i === k)); rows.forEach((r, i) => r.classList.toggle("on", i === k));
 }
-if (player && player.tagName === "VIDEO") player.addEventListener("timeupdate", () => follow(player.currentTime));
-document.addEventListener("click", (e) => { const b = e.target.closest(".stamp, .stamp-like"); if (b && b.dataset.t) follow(Number(b.dataset.t)); }, true);
+document.addEventListener("uw:time", (e) => follow(e.detail));
 })();`;

@@ -15,6 +15,21 @@ touches the site again.
    video.
 3. Write 3–7 points, each citing the stamp where the point is made (or best
    made). Open with one sentence on what the video is and who made it `[M]`.
+   For a long video, follow it with an "In short" quote of 4–6 points for the
+   whole, then one `##` section per part, in the video's order, each opening
+   with its own brief before its points:
+
+   ```markdown
+   ## The part's title
+
+   > **In short** — two or three sentences of prose: what this part is about
+   > and what is argued in it, by whom [V1 12:34; V1 15:02]
+
+   - the detailed points, one per bullet, each cited [V1 12:34]
+   ```
+
+   The brief is prose that links the points, not another list; it only says
+   what the points below say. `html` shows it and folds the points beneath it.
 4. For a long video (over ~40 minutes), read chapter by chapter and summarise
    each before the whole; cite the stamps inside, never only the chapter start.
 5. To let the user watch while reading, render it after `check` passes:

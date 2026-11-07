@@ -64,7 +64,8 @@ ultrawatch search <query> [--out <dir>] [--limit <n>] [--videos <id,id,…>] [--
 ultrawatch frames <url|id|dir> [--effort low|med|high] [--out <dir>] [--lang <tag>] [--json]
 ultrawatch list <playlist|channel> [--limit <n>] [--out <dir>] [--lang <tag>] [--refresh] [--json]
 ultrawatch check <run> <answer.md> [--videos <id,id,…>] [--json]
-ultrawatch html <url|file|id|dir> [--summary <answer.md>] [--to <page.html>] [--out <dir>] [--json]
+ultrawatch html <url|file|id|dir> [--summary <answer.md>] [--to <page.html>] [--frames] [--follow] [--out <dir>] [--json]
+ultrawatch serve [dir] [--port <n>]
 ultrawatch doctor [--json]
 ```
 
@@ -87,12 +88,21 @@ ultrawatch doctor [--json]
   unknown `V#`, or stamp past the end or on nothing said or shown — and on an
   answer with no claim at all.
 - `html` — one self-contained page to watch and understand the video: the
-  player (the local file for a run read from disk, else the site's embed); an
-  overview with key figures, the outline as a clickable timeline with the
-  cited moments, the length of each part and the speech rate over time; the
-  `--summary` with every `[V1 mm:ss]` a button that seeks the player; the
-  chapters, the frames (run `frames` first to have them), and the whole
-  transcript, searchable and following playback. The parts are the video's
+  player (the local file, YouTube's embed, or both with a switch) with speeds
+  from 1× to 3× (YouTube stops at 2×); an overview with key figures, the
+  outline as a clickable timeline with the cited moments, the length of each
+  part and the speech rate over time; the `--summary` section by section,
+  each section's "In short" shown and its points folded beneath, every
+  `[V1 mm:ss]` a button that seeks the player; the chapters and the whole
+  transcript, searchable, the passage being played marked. No frames unless
+  `--frames` (only when the visuals matter: slides, code, a demo — run
+  `frames` first). The page never scrolls on its own; `--follow` (only when
+  the user asks) starts it with the transcript scrolling along. The parts
+  are the video's chapters, else the summary's `##` sections that follow the
+  video in order — so write those sections in the video's order.
+- `serve` — the pages of a folder over `http://127.0.0.1`, this machine only.
+  Opened from disk a page plays the local file; YouTube's player refuses a
+  page opened from disk (error 153), so offer `serve` when the user wants it. The parts are the video's
   chapters, else the summary's `##` sections that follow the video in order —
   so write those sections in the video's order. Written to `--to`, else
   `<dir>/<id>/index.html`; labels follow the video's language (`--lang`).
@@ -103,6 +113,9 @@ check failing), 2 the invocation was wrong.
 ## Write the answer
 
 1. Lead with the answer, then the evidence; one idea per paragraph or bullet.
+   In a long summary, open each `##` section with a cited `> **In short** —`
+   brief of two or three sentences, then its points
+   ([modes](references/modes.md)): bullets alone read as a heap.
 2. Cite the segment's own stamp — the one `TRANSCRIPT.md` or `search` shows —
    not a stamp you estimate.
 3. Quote sparingly and exactly; mark auto-caption or whisper transcripts.
@@ -113,7 +126,8 @@ check failing), 2 the invocation was wrong.
 6. When the user wants to see or study the video, or asks for HTML: after
    `check` passes, `ultrawatch html <id> --out <dir> --summary <dir>/answer.md
    --to <page.html>` — one page per video, the summary's stamps seeking the
-   player. Run `frames <id> --effort low` before it when the visuals matter.
+   player. Only when the visuals matter, `frames <id> --effort low` first and
+   `--frames` on `html`.
 7. Give the user every file by its absolute path: the answer, and each video's
    full transcript (`<dir>/<id>/TRANSCRIPT.md`) for reading beyond the answer.
    Say when `<dir>` sits under a temporary directory, and offer to copy them
