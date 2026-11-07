@@ -261,6 +261,10 @@ export async function extractLocalFrames(
   const path = resolve(file);
   const base = opts.run ?? shAsync;
   const run: VideoRunner = async (cmd, args, o) => {
+    // Scene detection decodes every frame of the file; a two-hour AV1 file
+    // keeps every core busy for half an hour. Keyframes alone (one every few
+    // seconds) find the same cuts in seconds, and keep their timestamps.
+    if (cmd === "ffmpeg" && args.some((a) => a.startsWith("select='gt(scene")) && args.includes("-i")) return base(cmd, ["-skip_frame", "nokey", ...args], o);
     if (cmd !== "yt-dlp") return base(cmd, args, o);
     const template = args[args.indexOf("-o") + 1];
     if (!args.includes("-o") || !template) return { ok: false, status: 1, stdout: "", stderr: "a local file is only ever downloaded" };

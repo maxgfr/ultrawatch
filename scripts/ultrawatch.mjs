@@ -9205,6 +9205,7 @@ async function extractLocalFrames(runDir, file, opts = {}) {
   const path = resolve4(file);
   const base2 = opts.run ?? shAsync;
   const run2 = async (cmd, args, o) => {
+    if (cmd === "ffmpeg" && args.some((a) => a.startsWith("select='gt(scene")) && args.includes("-i")) return base2(cmd, ["-skip_frame", "nokey", ...args], o);
     if (cmd !== "yt-dlp") return base2(cmd, args, o);
     const template = args[args.indexOf("-o") + 1];
     if (!args.includes("-o") || !template) return { ok: false, status: 1, stdout: "", stderr: "a local file is only ever downloaded" };

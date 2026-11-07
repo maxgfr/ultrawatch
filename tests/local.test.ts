@@ -90,14 +90,18 @@ describe("a local video file", () => {
     if (!r.ok) throw new Error(r.reason);
     expect(localFileOf(r.dir)).toBe(f);
     const seen: { cmd: string; input?: string }[] = [];
+    const seenArgs: string[][] = [];
     const tools: VideoRunner = async (cmd, args) => {
       const input = args[args.indexOf("-i") + 1];
       seen.push({ cmd, input });
+      if (cmd === "ffmpeg") seenArgs.push(args);
       return { ok: true, status: 0, stdout: "", stderr: "" };
     };
     await extractLocalFrames(r.dir, f, { effort: "low", run: tools, have: () => true });
     expect(seen.some((c) => c.cmd === "yt-dlp")).toBe(false);
     const ffmpeg = seen.find((c) => c.cmd === "ffmpeg");
     expect(ffmpeg?.input).toMatch(/video\.webm$/);
+    const scene = seenArgs.find((a) => a.some((x) => x.startsWith("select='gt(scene")));
+    expect(scene?.slice(0, 2)).toEqual(["-skip_frame", "nokey"]);
   });
 });
