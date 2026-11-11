@@ -22,10 +22,12 @@ import { join as join3 } from "path";
 import { existsSync as existsSync2, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "fs";
 import { join as join4 } from "path";
 import { mkdirSync, renameSync, unlinkSync, writeFileSync as writeFileSync4 } from "fs";
+import { chmodSync, lstatSync, mkdirSync as mkdirSync2 } from "fs";
+import { dirname } from "path";
 import { existsSync as existsSync3, readdirSync as readdirSync3, readFileSync as readFileSync5, statSync } from "fs";
 import { join as join5, resolve } from "path";
 import { randomUUID } from "crypto";
-import { copyFileSync, cpSync, existsSync as existsSync4, mkdirSync as mkdirSync2, readdirSync as readdirSync4, readFileSync as readFileSync6, renameSync as renameSync2, rmSync as rmSync3 } from "fs";
+import { copyFileSync, cpSync, existsSync as existsSync4, mkdirSync as mkdirSync3, readdirSync as readdirSync4, readFileSync as readFileSync6, renameSync as renameSync2, rmSync as rmSync3 } from "fs";
 import { join as join6, resolve as resolve2 } from "path";
 import { join as join7 } from "path";
 import { basename } from "path";
@@ -34,7 +36,7 @@ import { EventEmitter } from "events";
 import { accessSync, constants, statSync as statSync2 } from "fs";
 import { homedir } from "os";
 import { posix, win32 } from "path";
-import { chmodSync, copyFileSync as copyFileSync2, existsSync as existsSync5, lstatSync, mkdirSync as mkdirSync3, readdirSync as readdirSync5, readFileSync as readFileSync7, realpathSync, rmSync as rmSync4, statSync as statSync3, writeFileSync as writeFileSync5 } from "fs";
+import { chmodSync as chmodSync2, copyFileSync as copyFileSync2, existsSync as existsSync5, lstatSync as lstatSync2, mkdirSync as mkdirSync4, readdirSync as readdirSync5, readFileSync as readFileSync7, realpathSync, rmSync as rmSync4, statSync as statSync3, writeFileSync as writeFileSync5 } from "fs";
 import { homedir as homedir2 } from "os";
 import { basename as basename2, join as join8, resolve as resolve3, sep } from "path";
 import { randomUUID as randomUUID2 } from "crypto";
@@ -45,6 +47,7 @@ import { mkdir, open, readFile, rename, rm, stat, writeFile } from "fs/promises"
 import { existsSync as existsSync7, statSync as statSync5 } from "fs";
 import { isAbsolute as isAbsolute2, join as join10 } from "path";
 import { join as join11 } from "path";
+import { createContext, Script } from "vm";
 import { promisify } from "util";
 import { gunzip } from "zlib";
 var __defProp = Object.defineProperty;
@@ -1293,7 +1296,7 @@ async function whisperTranscribe(info, language, run2, signal, knownOnly = false
     writeFileSync3(infoPath, info);
     const dl = await downloadMedia(["--load-info-json", infoPath, "-f", AUDIO_FORMAT], dir, "audio", { run: run2, timeoutMs: left, signal, knownOnly });
     if (signal?.aborted) return refund({ failed: "whisper: cancelled" });
-    if ("timedOut" in dl) return timedOut;
+    if ("timedOut" in dl) return refund(timedOut);
     if ("error" in dl) return refund({ failed: `whisper: the audio download failed (${dl.error})` });
     const audio = dl.file;
     const wav = join4(dir, "speech.wav");
@@ -1303,7 +1306,7 @@ async function whisperTranscribe(info, language, run2, signal, knownOnly = false
     });
     if (ff.missing) return refund({ failed: "whisper needs ffmpeg", unavailable: true });
     if (signal?.aborted) return refund({ failed: "whisper: cancelled" });
-    if (ff.status === 124) return timedOut;
+    if (ff.status === 124) return refund(timedOut);
     if (!ff.ok || !existsSync2(wav)) return refund({ failed: "whisper: ffmpeg could not convert the audio" });
     const args = ["--with", PYAV_PIN, "whisper-ctranslate2", wav, "--model", whisperModel(), "--output_format", "json", "--output_dir", dir];
     const lang = whisperLanguage(language);
@@ -1575,6 +1578,60 @@ var init_no_write = __esm({
     tmpCounter = 0;
   }
 });
+function openPrivateTmpDir(dir, create) {
+  const uid = typeof process.getuid === "function" ? process.getuid() : void 0;
+  if (create) mkdirSync2(dirname(dirname(dir)), { recursive: true });
+  const levels = [dirname(dir), dir];
+  let parentClosed = false;
+  for (const [i, p] of levels.entries()) {
+    if (create) mkdirPrivate(p);
+    let st;
+    try {
+      st = lstatSync(p);
+    } catch (e) {
+      if (e.code === "ENOENT") return {};
+      return { refused: `${p} cannot be inspected (${e.message})` };
+    }
+    if (st.isSymbolicLink()) return { refused: `${p} is a symbolic link` };
+    if (!st.isDirectory()) return { refused: `${p} is not a directory` };
+    if (st.uid !== uid) return { refused: `${p} belongs to another user` };
+    if (i === 0) parentClosed = (st.mode & 9) === 0;
+    if (st.mode & 18 && (i === 0 || !parentClosed || isNoWrite())) {
+      return { refused: `${p} is writable by other users (it is yours: \`chmod 700 ${p}\` if you trust what it holds)` };
+    }
+    if (st.mode & 63 && !isNoWrite()) {
+      try {
+        chmodSync(p, 448);
+      } catch {
+      }
+    }
+  }
+  return { dir };
+}
+function mkdirPrivate(p) {
+  try {
+    mkdirSync2(p, { mode: 448 });
+  } catch (e) {
+    if (e.code !== "EEXIST") throw e;
+  }
+}
+var init_private_dir = __esm({
+  "src/private-dir.ts"() {
+    "use strict";
+    init_no_write();
+  }
+});
+var REDIRECT_STATUS;
+var DOT_SEGMENT;
+var MAX_IDENT;
+var init_shared = __esm({
+  "src/shared.ts"() {
+    "use strict";
+    REDIRECT_STATUS = /* @__PURE__ */ new Set([301, 302, 303, 307, 308]);
+    DOT_SEGMENT = /^(?:\.|%2e){1,2}$/i;
+    MAX_IDENT = 64;
+  }
+});
 function isStopword(term) {
   const t = term.toLowerCase();
   if (STOPWORDS.has(t)) return true;
@@ -1634,7 +1691,6 @@ var CJK_RUNS;
 var ACCENT_CLASSES;
 var BASE_OF;
 var NON_ASCII;
-var MAX_IDENT;
 var MAX_PATTERNS;
 var MAX_KEYWORD_CHARS;
 var VARIANT_PRIORITY;
@@ -1649,6 +1705,7 @@ var init_text = __esm({
     "use strict";
     init_brand();
     init_url();
+    init_shared();
     STOPWORDS = /* @__PURE__ */ new Set([
       "the",
       "a",
@@ -1863,7 +1920,6 @@ var init_text = __esm({
       for (const ch of cls) BASE_OF.set(ch, base2);
     }
     NON_ASCII = /[\u0080-\uffff]/;
-    MAX_IDENT = 64;
     MAX_PATTERNS = 24;
     MAX_KEYWORD_CHARS = 256;
     VARIANT_PRIORITY = { original: 0, folded: 1, subtoken: 2 };
@@ -1899,7 +1955,7 @@ function pushTerm(raw, out, expand2) {
   const t = foldCached(raw);
   if (t.length < 2) return;
   out.push(t);
-  if (!expand2 || raw.length > MAX_IDENT2) return;
+  if (!expand2 || raw.length > MAX_IDENT) return;
   for (const sub of subtermsCached(raw, t)) out.push(sub);
 }
 function pushBigrams(run2, out) {
@@ -2023,13 +2079,16 @@ function bm25Score(index, doc) {
   const { k1, b, avgdl } = index;
   const lenNorm = 1 - b + b * (avgdl ? dl / avgdl : 1);
   let score = 0;
-  const stems = index.queryTerms.map(bm25Stem);
-  index.queryTerms.forEach((term, i) => {
-    const f = tf.get(stems[i]);
-    if (!f) return;
+  const stems = [];
+  for (const term of index.queryTerms) {
+    const stem = bm25Stem(term);
+    if (stems.includes(stem)) continue;
+    stems.push(stem);
+    const f = tf.get(stem);
+    if (!f) continue;
     const idf = index.idf.get(term) ?? 0;
     score += idf * (f * (k1 + 1)) / (f + k1 * lenNorm);
-  });
+  }
   return score * (1 + proximityBonus(toks, stems));
 }
 var byCodeUnit;
@@ -2039,7 +2098,6 @@ var NON_ASCII2;
 var CJK_CHAR2;
 var CJK_RUNS2;
 var IDENT_BOUNDARY;
-var MAX_IDENT2;
 var FOLD_CACHE_MAX;
 var foldCache;
 var NO_SUBTERMS;
@@ -2059,6 +2117,7 @@ var init_rank = __esm({
     init_text();
     init_trim();
     init_url();
+    init_shared();
     byCodeUnit = (a, b) => a < b ? -1 : a > b ? 1 : 0;
     indexTokenCache = /* @__PURE__ */ new WeakMap();
     WORD_SPLIT = /[^\p{L}\p{M}\p{N}_]+/u;
@@ -2066,7 +2125,6 @@ var init_rank = __esm({
     CJK_CHAR2 = /[\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}]/u;
     CJK_RUNS2 = /([\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}]+)/u;
     IDENT_BOUNDARY = new RegExp("_|[\\p{Ll}\\p{N}]\\p{Lu}|\\p{Lu}\\p{Lu}\\p{Ll}|\\p{L}\\p{N}|\\p{N}\\p{L}", "u");
-    MAX_IDENT2 = 64;
     FOLD_CACHE_MAX = 5e4;
     foldCache = /* @__PURE__ */ new Map();
     NO_SUBTERMS = [];
@@ -2082,7 +2140,12 @@ var init_rank = __esm({
   }
 });
 function videoRoot(out) {
-  return resolve((out?.trim() ? out : void 0) ?? env("VIDEO_DIR") ?? userTmpDir("video"));
+  const named = (out?.trim() ? out : void 0) ?? env("VIDEO_DIR");
+  if (named !== void 0 || typeof process.getuid !== "function") return resolve(named ?? userTmpDir("video"));
+  const dir = resolve(userTmpDir("video"));
+  const { refused } = openPrivateTmpDir(dir, !isNoWrite());
+  if (refused) throw new Error(`the video directory is not used: ${refused}. Remove it, or set ${envName("VIDEO_DIR")} to a directory only you can write.`);
+  return dir;
 }
 function servesLang(meta, lang) {
   if (!lang) return true;
@@ -2194,7 +2257,7 @@ function searchVideoRuns(dir, query, opts = {}) {
     const key = meta.key ?? meta.id;
     for (const parts of passageGroups(
       run2.segments,
-      (meta.chapters ?? []).map((c) => c.start)
+      (meta.chapters ?? []).map((c) => c.start).sort((a, b) => a - b)
     )) {
       const chapter = chapterAt(meta.chapters ?? [], parts[0].start);
       docs.push({ id: `${key}@${parts[0].start}`, title: "", headings: chapter ?? "", body: parts.map((s) => s.text).join(" "), parts, meta, key, chapter });
@@ -2234,6 +2297,7 @@ var init_run = __esm({
     "use strict";
     init_brand();
     init_no_write();
+    init_private_dir();
     init_rank();
     init_ladder3();
     init_markdown();
@@ -2248,7 +2312,7 @@ var init_run = __esm({
       }
     };
     PASSAGE_S = 45;
-    chapterAt = (chapters, t) => [...chapters].reverse().find((c) => c.start <= t + 0.5)?.title;
+    chapterAt = (chapters, t) => [...chapters].sort((a, b) => b.start - a.start).find((c) => c.start <= t + 0.5)?.title;
   }
 });
 function withRunLock(slug, fn) {
@@ -2387,7 +2451,7 @@ async function extractFrames(runDir, opts = {}) {
     const input = join6(tmp, video);
     const ffmpeg = (args) => deps.run("ffmpeg", ["-nostdin", "-hide_banner", ...args], { timeoutMs: FRAMES_TIMEOUT_MS, signal: opts.signal });
     const sceneDir = join6(tmp, "scene");
-    mkdirSync2(sceneDir);
+    mkdirSync3(sceneDir);
     const sceneArgs = (sync) => [
       "-i",
       input,
@@ -2420,7 +2484,7 @@ async function extractFrames(runDir, opts = {}) {
     if (!candidates2.length) return { ok: false, reason: `ffmpeg took no frame from the video${scenes.ok ? "" : ` (${lastLine(scenes.stderr)})`}` };
     candidates2.sort((a, b) => a.time - b.time);
     const candDir = join6(tmp, "cand");
-    mkdirSync2(candDir);
+    mkdirSync3(candDir);
     candidates2.forEach((c, i) => copyFileSync(c.path, join6(candDir, `${String(i + 1).padStart(4, "0")}.jpg`)));
     const raw = join6(tmp, "hash.raw");
     await ffmpeg(["-loglevel", "error", "-i", join6(candDir, "%04d.jpg"), "-vf", "scale=9:8,format=gray", "-f", "rawvideo", "-y", raw]);
@@ -2433,7 +2497,7 @@ async function extractFrames(runDir, opts = {}) {
     }
     const chosen = capFrames(kept, FRAME_EFFORT[effort]);
     const staged = join6(tmp, "frames");
-    mkdirSync2(staged);
+    mkdirSync3(staged);
     const placed = chosen.map((c, i) => {
       const file = `frames/${String(i + 1).padStart(4, "0")}_${fileStamp(c.time)}.jpg`;
       copyFileSync(c.path, join6(tmp, file));
@@ -3672,7 +3736,6 @@ __export(discovery_exports, {
   listPages: () => listPages,
   listTargets: () => listTargets,
   loopbackSocketUrl: () => loopbackSocketUrl,
-  newTarget: () => newTarget,
   parseCdpEndpoint: () => parseCdpEndpoint
 });
 function assertLoopback(host) {
@@ -3747,15 +3810,6 @@ function listTargets(port, host = "127.0.0.1") {
 async function listPages(port, host = "127.0.0.1") {
   return (await listTargets(port, host)).filter((t) => t.type === "page");
 }
-async function newTarget(port, url, host = "127.0.0.1") {
-  const path = url === void 0 ? "/json/new" : `/json/new?${encodeURIComponent(url)}`;
-  try {
-    return await json("PUT", port, host, path);
-  } catch (e) {
-    if (!/answered HTTP/.test(e.message)) throw e;
-    return json("GET", port, host, path);
-  }
-}
 async function command(port, host, path) {
   const { status, body } = await http("GET", port, host, path);
   if (status < 200 || status >= 300) throw new Error(`DevTools GET ${path} answered HTTP ${status}`);
@@ -3816,11 +3870,11 @@ function writeProfileKind(name, kind) {
 }
 function ensurePrivateDir(path) {
   try {
-    mkdirSync3(path, { recursive: true, mode: 448 });
+    mkdirSync4(path, { recursive: true, mode: 448 });
   } catch (e) {
     if (e.code !== "EEXIST") throw e;
   }
-  const st = lstatSync(path);
+  const st = lstatSync2(path);
   if (st.isSymbolicLink()) throw new Error(`${path} is a symbolic link`);
   if (!st.isDirectory()) throw new Error(`${path} is not a directory`);
   if (typeof process.getuid === "function" && st.uid !== process.getuid()) {
@@ -3828,7 +3882,7 @@ function ensurePrivateDir(path) {
   }
   if (process.platform === "win32") return;
   if (st.mode & 18) throw new Error(`${path} is writable by other users`);
-  if (st.mode & 63) chmodSync(path, 448);
+  if (st.mode & 63) chmodSync2(path, 448);
 }
 var PROFILE_NAME;
 var init_profile = __esm({
@@ -4692,8 +4746,9 @@ var init_session = __esm({
        * (a cold server, a render-blocking script that holds even DOMContentLoaded)
        * is the page now, still loading: it resolves, with a `note`.
        */
-      async navigate(url, opts = {}) {
-        assertOpenableUrl(url);
+      async navigate(given, opts = {}) {
+        assertOpenableUrl(given);
+        const url = given.trim().startsWith("#") ? new URL(given.trim(), await this.currentUrl()).href : given;
         const waitUntil = opts.waitUntil ?? "load";
         const timeoutMs = opts.timeoutMs ?? NAVIGATION_TIMEOUT_MS;
         const nav = this.watch();
@@ -6629,7 +6684,9 @@ var defaultTimeoutMs2;
 var DEFAULT_MAX_RESPONSE_BYTES;
 var mimeOf;
 var namesDocument;
-var REDIRECT_STATUS;
+var CREDENTIAL_HEADERS;
+var carriesCredential;
+var anyUrl;
 var INLINE_FORMAT;
 var INLINE_FORMAT_TAG;
 var NUL2;
@@ -6685,13 +6742,16 @@ var init_fetch = __esm({
     init_mode();
     init_junk();
     init_walls();
+    init_shared();
     DEFAULT_BROWSER_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
     RETRY_STATUS = /* @__PURE__ */ new Set([429, 503, 502, 504]);
     defaultTimeoutMs2 = () => envInt("TIMEOUT_MS", 2e4, 1e3, 3e5);
     DEFAULT_MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
     mimeOf = (contentType) => contentType.split(";")[0].trim().toLowerCase();
     namesDocument = (filename) => filename !== void 0 && (PDF_URL_RE.test(filename) || docFormatForUrl(filename) !== void 0);
-    REDIRECT_STATUS = /* @__PURE__ */ new Set([301, 302, 303, 307, 308]);
+    CREDENTIAL_HEADERS = ["authorization", "cookie", "proxy-authorization", "x-api-key", "api-key", "private-token", "x-auth-token"];
+    carriesCredential = (headers) => CREDENTIAL_HEADERS.some((h) => headers[h] !== void 0);
+    anyUrl = async () => true;
     INLINE_FORMAT = /* @__PURE__ */ new Set([...INLINE_TAGS, "br", "scp"]);
     INLINE_FORMAT_TAG = /<(\/?)([a-zA-Z][\w.-]*(?::[\w.-]+)?)(?=[\s/>])([^<>]*)>/g;
     NUL2 = "\0";
@@ -7388,9 +7448,19 @@ function urlMatcher(pattern) {
   const re = /^\/(.+)\/([a-z]*)$/.exec(pattern);
   if (re) {
     try {
-      const rx = new RegExp(re[1], re[2]);
-      return (u) => rx.test(u);
-    } catch {
+      new RegExp(re[1], re[2]);
+      const ctx = createContext({ src: re[1], flags: re[2], u: "" });
+      const test = new Script("new RegExp(src, flags).test(u)");
+      return (u) => {
+        ctx.u = u;
+        try {
+          return test.runInContext(ctx, { timeout: REGEX_BUDGET_MS }) === true;
+        } catch {
+          throw new Error(`the /regex/ given to wait --url took too long on ${u.slice(0, 200)}: simplify it`);
+        }
+      };
+    } catch (e) {
+      if (e.message.includes("took too long")) throw e;
     }
   }
   if (pattern.includes("*")) {
@@ -7476,6 +7546,7 @@ var DEFAULT_TIMEOUT_MS3;
 var CLEAR_TIMEOUT_MS;
 var EVAL_TIMEOUT_MS;
 var IDLE_MS;
+var REGEX_BUDGET_MS;
 var KEYS;
 var init_wait = __esm({
   "src/browser/wait.ts"() {
@@ -7504,6 +7575,7 @@ var init_wait = __esm({
     CLEAR_TIMEOUT_MS = 3e5;
     EVAL_TIMEOUT_MS = 2e3;
     IDLE_MS = 500;
+    REGEX_BUDGET_MS = 200;
     KEYS = ["text", "gone", "selector", "url", "load", "idle", "ms", "clear"];
   }
 });
@@ -7819,7 +7891,7 @@ var init_read = __esm({
     ASK_GRACE_MS = 15e3;
   }
 });
-var ENGINE_VERSION = "1.37.1";
+var ENGINE_VERSION = "1.37.2";
 init_brand();
 init_pdf();
 init_doc();
@@ -7848,8 +7920,9 @@ init_exec2();
 init_brand();
 init_exec2();
 init_forge_host();
-init_no_write();
+init_private_dir();
 init_text();
+init_shared();
 var STALE_STAGING_MS = 24 * 60 * 60 * 1e3;
 init_brand();
 init_exec2();
@@ -7858,6 +7931,7 @@ init_forge_host();
 init_retry();
 init_text();
 init_trim();
+init_shared();
 var MAX_BODY_BYTES = 4 * 1024 * 1024;
 init_fetch();
 init_trim();
@@ -7880,6 +7954,7 @@ init_brand();
 init_fetch();
 init_locale();
 init_url();
+init_shared();
 var INLINE_TAG = /<\/?(?:a|abbr|b|bdi|bdo|cite|code|em|i|kbd|mark|q|s|samp|small|span|strong|sub|sup|time|u|var|wbr)\b[^<>]*>/gi;
 function stripTags(s) {
   return decodeEntities(s.replace(INLINE_TAG, "").replace(/<[^<>]*>/g, " ")).replace(/\s+/g, " ").trim();
@@ -8032,6 +8107,7 @@ init_firecrawl();
 init_locale();
 init_trim();
 init_url();
+init_shared();
 var probeCache2 = new ProbeMemo();
 init_brand();
 init_fetch();
@@ -8040,6 +8116,7 @@ init_video();
 init_firecrawl();
 init_url();
 init_no_write();
+init_private_dir();
 init_brand();
 init_mode();
 var DEFAULT_TTL_MS = 24 * 60 * 60 * 1e3;
@@ -8115,6 +8192,8 @@ init_brand();
 init_fetch();
 init_pool();
 init_trim();
+var MIN_ANSWER_BYTES = 4 * 1024 * 1024;
+var ANSWER_BYTES_PER_VECTOR = 128 * 1024;
 init_brand();
 init_fetch();
 init_rank();
@@ -8457,7 +8536,7 @@ function judge(tok, videos, line) {
 
 // src/html.ts
 import { existsSync as existsSync8, readFileSync as readFileSync9 } from "fs";
-import { dirname, isAbsolute, join as join12, relative, sep as sep2 } from "path";
+import { dirname as dirname2, isAbsolute, join as join12, relative, sep as sep2 } from "path";
 import { pathToFileURL } from "url";
 
 // src/stamps.ts
@@ -9036,7 +9115,7 @@ function runHtml(runDir, opts) {
   if (!run2) return { error: `no video run in ${runDir} \u2014 fetch the video first` };
   const meta = run2.meta;
   const segments = run2.segments;
-  const pageDir = dirname(opts.to);
+  const pageDir = dirname2(opts.to);
   const frames = opts.frames ? readFrames(runDir) : [];
   const chapters = [...meta.chapters ?? []].sort((a, b) => a.start - b.start);
   const lang = (opts.lang ?? meta.lang ?? meta.language ?? "en").toLowerCase().split(/[-_]/)[0];
@@ -9331,7 +9410,7 @@ function pagesIn(dir) {
 import { createHash as createHash2 } from "crypto";
 import { existsSync as existsSync9, mkdtempSync, readdirSync as readdirSync7, readFileSync as readFileSync10, rmSync, statSync as statSync7, symlinkSync } from "fs";
 import { tmpdir as tmpdir2 } from "os";
-import { basename as basename3, dirname as dirname2, extname as extname2, join as join14, resolve as resolve5 } from "path";
+import { basename as basename3, dirname as dirname3, extname as extname2, join as join14, resolve as resolve5 } from "path";
 import { pathToFileURL as pathToFileURL2 } from "url";
 function isLocalVideo(target) {
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target)) return false;
@@ -9367,7 +9446,7 @@ function sidecarVtt(path, lang) {
   const stem = basename3(path, extname2(path));
   let names;
   try {
-    names = readdirSync7(dirname2(path));
+    names = readdirSync7(dirname3(path));
   } catch {
     return void 0;
   }
@@ -9376,7 +9455,7 @@ function sidecarVtt(path, lang) {
   const pick2 = want && subs.find(
     (n) => n.slice(stem.length + 1, -4).toLowerCase().split(/[-_]/)[0] === want
   ) || (want ? void 0 : subs[0]);
-  return pick2 ? join14(dirname2(path), pick2) : void 0;
+  return pick2 ? join14(dirname3(path), pick2) : void 0;
 }
 function whisperSegments2(json2) {
   try {
