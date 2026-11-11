@@ -1611,6 +1611,7 @@ function foldTerm(raw) {
   return foldPlural(deaccent(raw.toLowerCase()));
 }
 function subtokens(raw) {
+  if (raw.length > MAX_IDENT) return [];
   const spaced = raw.replace(new RegExp("([\\p{Ll}\\p{N}])(\\p{Lu})", "gu"), "$1 $2").replace(new RegExp("(\\p{Lu}+)(\\p{Lu}\\p{Ll})", "gu"), "$1 $2").replace(new RegExp("(\\p{L})(\\p{N})", "gu"), "$1 $2").replace(new RegExp("(\\p{N})(\\p{L})", "gu"), "$1 $2");
   const parts = spaced.split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean);
   if (parts.length < 2) return [];
@@ -1633,7 +1634,9 @@ var CJK_RUNS;
 var ACCENT_CLASSES;
 var BASE_OF;
 var NON_ASCII;
+var MAX_IDENT;
 var MAX_PATTERNS;
+var MAX_KEYWORD_CHARS;
 var VARIANT_PRIORITY;
 var LIGATURE_SPELLING;
 var LIGATURE_OF;
@@ -1860,7 +1863,9 @@ var init_text = __esm({
       for (const ch of cls) BASE_OF.set(ch, base2);
     }
     NON_ASCII = /[\u0080-\uffff]/;
+    MAX_IDENT = 64;
     MAX_PATTERNS = 24;
+    MAX_KEYWORD_CHARS = 256;
     VARIANT_PRIORITY = { original: 0, folded: 1, subtoken: 2 };
     LIGATURE_SPELLING = { \u0153: "oe", \u00E6: "ae", \u00DF: "ss" };
     LIGATURE_OF = { oe: "\u0153", ae: "\xE6", ss: "\xDF" };
@@ -1894,7 +1899,7 @@ function pushTerm(raw, out, expand2) {
   const t = foldCached(raw);
   if (t.length < 2) return;
   out.push(t);
-  if (!expand2 || raw.length > MAX_IDENT) return;
+  if (!expand2 || raw.length > MAX_IDENT2) return;
   for (const sub of subtermsCached(raw, t)) out.push(sub);
 }
 function pushBigrams(run2, out) {
@@ -1949,9 +1954,9 @@ function bm25Stem(t) {
 function docTokens(doc, titleWeight, headingWeight, body) {
   const out = body ? [...body] : bm25Tokenize(doc.body);
   const headings = bm25Tokenize(doc.headings);
-  for (let r = 0; r < headingWeight; r++) out.push(...headings);
+  for (let r = 0; r < headingWeight; r++) for (const t of headings) out.push(t);
   const title = bm25Tokenize(doc.title);
-  for (let r = 0; r < titleWeight; r++) out.push(...title);
+  for (let r = 0; r < titleWeight; r++) for (const t of title) out.push(t);
   for (let i = 0; i < out.length; i++) out[i] = bm25Stem(out[i]);
   return out;
 }
@@ -2034,7 +2039,7 @@ var NON_ASCII2;
 var CJK_CHAR2;
 var CJK_RUNS2;
 var IDENT_BOUNDARY;
-var MAX_IDENT;
+var MAX_IDENT2;
 var FOLD_CACHE_MAX;
 var foldCache;
 var NO_SUBTERMS;
@@ -2061,7 +2066,7 @@ var init_rank = __esm({
     CJK_CHAR2 = /[\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}]/u;
     CJK_RUNS2 = /([\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}]+)/u;
     IDENT_BOUNDARY = new RegExp("_|[\\p{Ll}\\p{N}]\\p{Lu}|\\p{Lu}\\p{Lu}\\p{Ll}|\\p{L}\\p{N}|\\p{N}\\p{L}", "u");
-    MAX_IDENT = 64;
+    MAX_IDENT2 = 64;
     FOLD_CACHE_MAX = 5e4;
     foldCache = /* @__PURE__ */ new Map();
     NO_SUBTERMS = [];
@@ -2077,7 +2082,7 @@ var init_rank = __esm({
   }
 });
 function videoRoot(out) {
-  return resolve(out ?? env("VIDEO_DIR") ?? userTmpDir("video"));
+  return resolve((out?.trim() ? out : void 0) ?? env("VIDEO_DIR") ?? userTmpDir("video"));
 }
 function servesLang(meta, lang) {
   if (!lang) return true;
@@ -2196,7 +2201,7 @@ function searchVideoRuns(dir, query, opts = {}) {
     }
   }
   const index = buildBm25Index(query, docs);
-  const scored = docs.map((d) => ({ d, score: Math.round(bm25Score(index, d) * 1e3) / 1e3 })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score || a.d.key.localeCompare(b.d.key) || a.d.parts[0].start - b.d.parts[0].start).slice(0, opts.limit ?? 10);
+  const scored = docs.map((d) => ({ d, score: Math.round(bm25Score(index, d) * 1e3) / 1e3 })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score || (a.d.key < b.d.key ? -1 : a.d.key > b.d.key ? 1 : 0) || a.d.parts[0].start - b.d.parts[0].start).slice(0, opts.limit ?? 10);
   return scored.map(({ d, score }) => {
     let best = d.parts[0];
     let top = 0;
@@ -3598,7 +3603,9 @@ function detectBrowserBinary(opts = {}) {
   const explicit = opts.env ? opts.env("BROWSER_BIN") : env("BROWSER_BIN");
   if (explicit) {
     const bare = !/[\\/]/.test(explicit);
-    const options = bare ? (sys.PATH ?? "").split(":").filter(Boolean).map((d) => posix.join(d, explicit)) : [explicit];
+    const win = platform === "win32";
+    const names = win && !/\.[a-z0-9]+$/i.test(explicit) ? [explicit, `${explicit}.exe`] : [explicit];
+    const options = bare ? (sys.PATH ?? (win ? sys.Path : void 0) ?? "").split(win ? ";" : ":").filter(Boolean).flatMap((d) => names.map((n) => (win ? win32 : posix).join(d, n))) : [explicit];
     const found = options.find(exists);
     if (!found) throw new Error(`BROWSER_BIN points at "${explicit}", which is not an executable file`);
     return { kind: kindOf(found), path: found };
@@ -6206,6 +6213,7 @@ var init_locale = __esm({
 });
 var FIRECRAWL_DEFAULT_BASE;
 var PROBE_TIMEOUT_MS2;
+var PROBE_BODY_BYTES;
 var SCRAPE_TIMEOUT_MS;
 var SEARCH_TIMEOUT_MS;
 var SERVER_MARGIN_MS;
@@ -6223,6 +6231,7 @@ var init_firecrawl = __esm({
     init_trim();
     FIRECRAWL_DEFAULT_BASE = "http://localhost:3002";
     PROBE_TIMEOUT_MS2 = 2e3;
+    PROBE_BODY_BYTES = 4096;
     SCRAPE_TIMEOUT_MS = 45e3;
     SEARCH_TIMEOUT_MS = 3e4;
     SERVER_MARGIN_MS = { scrape: 5e3, search: 2e3 };
@@ -7810,7 +7819,7 @@ var init_read = __esm({
     ASK_GRACE_MS = 15e3;
   }
 });
-var ENGINE_VERSION = "1.37.0";
+var ENGINE_VERSION = "1.37.1";
 init_brand();
 init_pdf();
 init_doc();
@@ -7839,6 +7848,7 @@ init_exec2();
 init_brand();
 init_exec2();
 init_forge_host();
+init_no_write();
 init_text();
 var STALE_STAGING_MS = 24 * 60 * 60 * 1e3;
 init_brand();
